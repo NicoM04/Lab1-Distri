@@ -1,0 +1,19 @@
+name: C++ CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make -C nbody_2d
+
+      - name: Run basic acceleration check
+        run: ./nbody_2d/nbody_2d
