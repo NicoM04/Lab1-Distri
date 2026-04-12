@@ -18,14 +18,34 @@ Implementacion inicial serial para el Laboratorio 1 de N-Cuerpos.
 
 ## Requisitos
 
-- Compilador compatible con C++17
-- make
+- WSL Ubuntu con g++ (>= 11) y make instalados
 
 ## Compilar y ejecutar
 
+1. Abrí una terminal WSL Ubuntu en VS Code.
+2. Navegá al directorio del proyecto:
+
 ```bash
+cd "/mnt/c/Users/matia/OneDrive/Escritorio/Lab1 Distri/nbody_2d"
+```
+
+3. Limpiar y compilar:
+
+```bash
+make clean
 make
+```
+
+4. Ejecutar simulación base:
+
+```bash
 ./nbody_2d
+```
+
+5. Ejecutar test básico de aceleración:
+
+```bash
+make test
 ```
 
 ## Docker

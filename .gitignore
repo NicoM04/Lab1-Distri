@@ -1,0 +1,31 @@
+# Compilados y binarios
+*.o
+*.a
+*.so
+nbody_2d/nbody_2d
+nbody_2d/tests/test_acceleration
+
+# Build artifacts genéricos
+build/
+dist/
+
+# CSV y snapshots generados en runtime
+*.csv
+
+# Docker
+*.tar
+
+# VS Code
+.vscode/
+
+# Editores
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini

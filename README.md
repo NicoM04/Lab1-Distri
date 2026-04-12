@@ -62,19 +62,28 @@ Ejecuta los siguientes comandos para asegurar que todo está correctamente insta
 
 ## 5. Comandos Útiles del Proyecto
 
-### Compilación Manual (Serial)
-```bash
-g++ -O3 -Wall -Wextra main.cpp Particle.cpp NBodySystem.cpp -o nbody_sim
-```
+1. Abrí una terminal **WSL Ubuntu** en VS Code.
+2. Navegá al directorio del proyecto:
+    ```bash
+    cd nbody_2d
+    ```
+3. Limpiar y compilar:
+    ```bash
+    make clean
+    make
+    ```
+4. Ejecutar simulación base:
+    ```bash
+    ./nbody_2d
+    ```
+5. Ejecutar test básico de aceleración:
+    ```bash
+    make test
+    ```
 
-### Compilación con OpenMP (Paralelo)
+### Compilación con OpenMP (Semana 2 en adelante)
 ```bash
-g++ -O3 -fopenmp main.cpp Particle.cpp NBodySystem.cpp -o nbody_parallel
-```
-
-### Ejecución
-```bash
-./nbody_sim
+g++ -O3 -fopenmp -Wall -Wextra -std=c++17 main.cpp Particle.cpp NBodySystem.cpp NBodySimulator.cpp Integrator.cpp MetricsCalculator.cpp Benchmark.cpp Visualizer.cpp -o nbody_2d
 ```
 
 ---
