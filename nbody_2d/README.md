@@ -2,6 +2,10 @@
 
 Implementacion inicial serial para el Laboratorio 1 de N-Cuerpos.
 
+Estado actual:
+- Semana 1 completa.
+- Semana 2 completa: computeAccelerations en paralelo (OpenMP), comparacion serial vs paralelo para N pequeno y verificacion con tolerancia de coma flotante.
+
 ## Estructura
 
 - main.cpp
@@ -47,6 +51,17 @@ make
 ```bash
 make test
 ```
+
+Esto ejecuta:
+- `tests/test_acceleration` (caso base semana 1).
+- `tests/test_parallel_vs_serial` (semana 2: equivalencia serial/paralelo con tolerancia `1e-12`).
+
+## Semana 2: Paralelizacion y comparacion
+
+- `NBodySystem::computeAccelerationsParallel(schedule_type, chunk_size)` usa OpenMP.
+- `schedule_type`: `0=static`, `1=dynamic`, `2=guided`, `3=auto`.
+- `Benchmark::compareSerialVsParallel(...)` reporta tiempo serial/paralelo, speedup y diferencia maxima de aceleracion.
+- En `main.cpp` se imprime la comparacion con `N` pequeno y se valida `max |dA| <= 1e-12`.
 
 ## Docker
 

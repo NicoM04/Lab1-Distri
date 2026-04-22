@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "Benchmark.h"
 #include "NBodySystem.h"
 
 namespace {
@@ -50,5 +51,35 @@ int main() {
     std::cout << "  tolerance = " << tolerance << "\n";
     std::cout << "  status    = " << (pass ? "PASS" : "FAIL") << "\n";
 
-    return pass ? EXIT_SUCCESS : EXIT_FAILURE;
+    constexpr std::size_t bench_n = 64;
+    constexpr int bench_steps = 25;
+    constexpr double dt = 0.01;
+    constexpr int schedule_type = 0;  // 0=static,1=dynamic,2=guided,3=auto
+    constexpr int chunk_size = 4;
+    constexpr unsigned int seed = 42;
+    constexpr double float_tolerance = 1e-12;
+
+    const BenchmarkComparisonResult comparison = Benchmark::compareSerialVsParallel(
+        bench_n,
+        bench_steps,
+        dt,
+        G,
+        eps,
+        schedule_type,
+        chunk_size,
+        seed
+    );
+
+    const bool compare_pass = comparison.max_abs_acc_diff <= float_tolerance;
+    std::cout << "\nWeek 2 - serial vs parallel (N pequeno):\n";
+    std::cout << "  N               = " << bench_n << "\n";
+    std::cout << "  steps           = " << bench_steps << "\n";
+    std::cout << "  serial [s]      = " << comparison.serial_seconds << "\n";
+    std::cout << "  parallel [s]    = " << comparison.parallel_seconds << "\n";
+    std::cout << "  speedup         = " << comparison.speedup << "x\n";
+    std::cout << "  max |dA|        = " << comparison.max_abs_acc_diff << "\n";
+    std::cout << "  tol flotante    = " << float_tolerance << "\n";
+    std::cout << "  compare status  = " << (compare_pass ? "PASS" : "FAIL") << "\n";
+
+    return (pass && compare_pass) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

@@ -17,6 +17,9 @@ public:
     void addParticle(const Particle& particle);
     void zeroAccelerations();
 
+    void computeAccelerationsSerial();
+    void computeAccelerationsParallel(int schedule_type = 0, int chunk_size = 0);
+
     void computeAccelerations();
     void computeAccelerations(int schedule_type);
     void computeAccelerations(int schedule_type, int chunk_size);
