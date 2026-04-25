@@ -6,8 +6,10 @@ SOURCES = main.cpp Particle.cpp NBodySystem.cpp NBodySimulator.cpp Integrator.cp
 OBJECTS = $(SOURCES:.cpp=.o)
 TEST_TARGET = tests/test_acceleration
 TEST_WEEK2_TARGET = tests/test_parallel_vs_serial
+TEST_WEEK3_TARGET = tests/test_integration
 TEST_SOURCES = tests/test_acceleration.cpp Particle.cpp NBodySystem.cpp
 TEST_WEEK2_SOURCES = tests/test_parallel_vs_serial.cpp Particle.cpp NBodySystem.cpp
+TEST_WEEK3_SOURCES = tests/test_integration.cpp Particle.cpp NBodySystem.cpp NBodySimulator.cpp Integrator.cpp
 
 .PHONY: all clean run test
 
@@ -28,9 +30,12 @@ $(TEST_TARGET): $(TEST_SOURCES)
 $(TEST_WEEK2_TARGET): $(TEST_WEEK2_SOURCES)
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-test: $(TEST_TARGET) $(TEST_WEEK2_TARGET)
+$(TEST_WEEK3_TARGET): $(TEST_WEEK3_SOURCES)
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+test: $(TEST_TARGET) $(TEST_WEEK2_TARGET) $(TEST_WEEK3_TARGET)
 	./$(TEST_TARGET)
 	./$(TEST_WEEK2_TARGET)
-
+	./$(TEST_WEEK3_TARGET)
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST_TARGET) $(TEST_WEEK2_TARGET)

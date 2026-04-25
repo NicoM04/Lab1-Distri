@@ -3,8 +3,10 @@
 
 #include "NBodySystem.h"
 
-namespace Integrator {
-void eulerStep(NBodySystem& system, double dt);
-}
+class Integrator {
+public:
+    static void eulerStep(NBodySystem& system, double dt, int sync_type = -1);
+    static void eulerStep(NBodySystem& system, double dt, bool use_barrier);
+};
 
 #endif
