@@ -12,6 +12,11 @@ dist/
 # CSV y snapshots generados en runtime
 *.csv
 
+# Benchmark outputs y resultados
+Resultados/
+*.dat
+*.png
+
 # Docker
 *.tar
 

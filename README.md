@@ -1,96 +1,124 @@
-#  Simulador N-Body - Configuración del Entorno (WSL2)
+# N-Body 2D con OpenMP
 
-Este documento detalla los pasos seguidos para configurar el entorno de desarrollo en **Windows** utilizando **WSL2**, permitiendo compilar y ejecutar código C++ con soporte nativo para **OpenMP**.
+Simulador 2D de N-cuerpos en C++17 con soporte OpenMP, integracion Euler y un modulo de benchmarks para analisis de scaling, comparacion de schedules, eficiencia y Ley de Amdahl.
 
-## 1. Instalación de WSL2 (Windows Subsystem for Linux)
-WSL2 permite ejecutar un entorno GNU/Linux directamente en Windows sin la sobrecarga de una máquina virtual tradicional.
+## Descripcion del proyecto
 
-* Abrir **PowerShell** como Administrador.
-* Ejecutar el comando:
-    ```powershell
-    wsl --install
-    ```
-* **Reiniciar la computadora.**
-* Al reiniciar, se abrirá una consola de Ubuntu. Sigue las instrucciones para crear tu **usuario** y **contraseña** (esta contraseña será necesaria para comandos `sudo`).
+El proyecto esta organizado en `nbody_2d/` y contiene:
 
----
+- `Particle`: particulas con masa, posicion, velocidad y aceleracion.
+- `NBodySystem`: calculo de aceleraciones serial y paralelo con OpenMP.
+- `NBodySimulator`: integracion Euler sobre el sistema.
+- `MetricsCalculator`: metricas fisicas basicas.
+- `Benchmark`: medicion de tiempo, estadisticas, speedup, eficiencia, Amdahl y exportacion a `.dat`.
+- `plot_scaling.py`: script externo en Python para generar graficos PNG.
 
-## 2. Configuración en Visual Studio Code
-Para trabajar desde Windows pero compilar en Linux:
+## Compilacion
 
-1.  Instala la extensión **WSL** (de Microsoft) en VS Code.
-2.  En la terminal de Ubuntu, navega a la carpeta de tu proyecto y escribe:
-    ```bash
-    code .
-    ```
-3.  VS Code se abrirá en "Modo WSL" (verás un recuadro azul en la esquina inferior izquierda que dice `WSL: Ubuntu`).
+Desde la carpeta `nbody_2d/`:
 
----
-
-## 3. Instalación de Herramientas de Desarrollo
-Una vez dentro de la terminal de Ubuntu (en VS Code o la consola independiente), instalar los compiladores y librerías necesarias:
-
-### Actualizar repositorios
 ```bash
-sudo apt update
+make clean
+make
 ```
 
-### Instalar Compilador, Make y OpenMP
-El paquete `build-essential` incluye `g++` y el soporte base para paralelismo:
+El ejecutable resultante es `nbody_2d`.
+
+## Ejecucion de benchmarks
+
+### Benchmark completo
+
 ```bash
-sudo apt install build-essential g++ make
+./nbody_2d -benchmark
 ```
 
-### Instalar GoogleTest (Pruebas Unitarias)
-Requerido por las especificaciones del Laboratorio 1:
+### Scaling
+
 ```bash
-sudo apt install libgtest-dev
+./nbody_2d -scaling -N 4000 -iters 10 -threads 1,2,4,8 -schedule static -chunk 16 -output wk4
 ```
 
----
+### Comparacion de schedules
 
-## 4. Verificación del Entorno
-Ejecuta los siguientes comandos para asegurar que todo está correctamente instalado:
-
-| Comando | Resultado esperado | Propósito |
-| :--- | :--- | :--- |
-| `g++ --version` | `g++ (Ubuntu 11.x.x) ...` | Compilador C++17/20 |
-| `make --version` | `GNU Make 4.3` | Automatización de builds |
-| `ldconfig -p \| grep libgomp` | `libgomp.so.1 (libc6,x86-64)` | Soporte de OpenMP activo |
-
----
-
-## 5. Comandos Útiles del Proyecto
-
-1. Abrí una terminal **WSL Ubuntu** en VS Code.
-2. Navegá al directorio del proyecto:
-    ```bash
-    cd nbody_2d
-    ```
-3. Limpiar y compilar:
-    ```bash
-    make clean
-    make
-    ```
-4. Ejecutar simulación base:
-    ```bash
-    ./nbody_2d
-    ```
-5. Ejecutar test básico de aceleración:
-    ```bash
-    make test
-    ```
-
-### Compilación con OpenMP (Semana 2 en adelante)
 ```bash
-g++ -O3 -fopenmp -Wall -Wextra -std=c++17 main.cpp Particle.cpp NBodySystem.cpp NBodySimulator.cpp Integrator.cpp MetricsCalculator.cpp Benchmark.cpp Visualizer.cpp -o nbody_2d
+./nbody_2d -schedules -N 4000 -iters 10 -threads 1,2,4,8 -chunks 1,4,16,64 -output wk4
 ```
 
----
+### Generacion automatica de graficos
 
-## 6. Solución de Problemas Comunes
-* **Error "Command not found":** Asegúrate de haber ejecutado el paso 3 (`sudo apt install`).
-* **Permisos denegados:** Recuerda anteponer `sudo` en comandos de instalación.
-* **VS Code no reconoce `omp.h`:** Instala el "C/C++ Extension Pack" dentro de la instancia de WSL en VS Code.
+```bash
+./nbody_2d -scaling -N 4000 -iters 10 -threads 1,2,4,8 -schedule static -chunk 16 -output wk4 -plot
+```
 
----
+## Parametros
+
+- `-N`: numero de particulas del problema.
+- `-iters`: repeticiones por experimento para calcular media y desviacion estandar.
+- `-threads`: lista separada por comas con los hilos a probar, por ejemplo `1,2,4,8`.
+- `-schedule`: tipo de schedule OpenMP para `computeAccelerations`.
+- `-chunk`: chunk size usado por `omp_set_schedule`.
+- `-output`: prefijo de salida para archivos `.dat` y `.png` (se guardan en `../Resultados`).
+- `-plot`: ejecuta automaticamente el script Python de graficacion despues de generar los `.dat`.
+
+## Salidas generadas
+
+Con `-output wk4` se generan archivos en la carpeta `Resultados` (al mismo nivel que `nbody_2d`), por ejemplo:
+
+- `Resultados/wk4_scaling.dat`
+- `Resultados/wk4_scaling_fullstep.dat`
+- `Resultados/wk4_schedules.dat`
+- `Resultados/wk4_schedules_fullstep.dat`
+- `Resultados/wk4_scaling.png`
+- `Resultados/wk4_amdahl.png`
+
+### Formato de `wk4_scaling.dat`
+
+```text
+threads time_mean time_std speedup efficiency amdahl_speedup
+1 10.0 0.2 1.0 1.0 1.0
+2 5.5 0.1 1.8 0.9 1.7
+```
+
+## Graficos
+
+El script `plot_scaling.py` genera:
+
+- tiempo promedio vs threads con barras de error
+- speedup vs threads
+- eficiencia vs threads
+- comparacion entre speedup medido y speedup teorico de Amdahl
+
+## Speedup y eficiencia
+
+- Speedup: $S_p = T_1 / T_p$
+- Eficiencia: $E_p = S_p / p$
+
+Donde:
+- $T_1$ es el tiempo con un hilo.
+- $T_p$ es el tiempo con $p$ hilos.
+
+## Ley de Amdahl
+
+El benchmark estima la fraccion serial $f$ a partir de resultados medidos y calcula:
+
+$$
+S_p = \frac{1}{f + \frac{1-f}{p}}
+$$
+
+Ese valor teorico se exporta junto a los datos medidos para comparar escalabilidad real vs esperada.
+
+## Requisitos del script de graficos
+
+Para usar `-plot` necesitas Python y matplotlib:
+
+```bash
+pip install matplotlib
+```
+
+Si el sistema usa otro comando de Python, el ejecutable intenta `py -3` y luego `python`.
+
+## Notas
+
+- El proyecto conserva compatibilidad con los comandos existentes.
+- La logica fisica del simulador no se modifica.
+- Los graficos se generan a partir de los `.dat` ya exportados, no desde C++.
