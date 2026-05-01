@@ -3,12 +3,14 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <random>
 #include <sstream>
 #include <cstdio>
 #include <string>
 #include <vector>
 
 #include "Benchmark.h"
+#include "Visualizer.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -72,6 +74,23 @@ int maxThreads() {
 #endif
 }
 
+NBodySystem buildRandomSystem(std::size_t n, double G, double eps, unsigned int seed) {
+    NBodySystem system(G, eps);
+
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<double> mass_dist(0.5, 2.0);
+    std::uniform_real_distribution<double> pos_dist(-10.0, 10.0);
+    std::uniform_real_distribution<double> vel_dist(-1.0, 1.0);
+
+    for (std::size_t i = 0; i < n; ++i) {
+        Particle p(mass_dist(rng), pos_dist(rng), pos_dist(rng));
+        p.setVelocity(vel_dist(rng), vel_dist(rng));
+        system.addParticle(p);
+    }
+
+    return system;
+}
+
 std::string quoteCommandArg(const std::string& value) {
     return "\"" + value + "\"";
 }
@@ -103,6 +122,12 @@ bool runPlotScript(const std::string& script_path, const std::string& dat_path, 
 void printUsage(const char* exe) {
     std::cout
         << "Usage: " << exe << " [options]\n"
+        << "  -simulate           Run simulation export mode (no realtime drawing)\n"
+        << "  -steps <int>        Simulation steps for export (default: 1000)\n"
+        << "  -sample <int>       Sample every K steps in trajectories.dat (default: 10)\n"
+        << "  -traj-output <path> Trajectories output path (default: trajectories.dat)\n"
+        << "  -energy-output <p>  Global metrics output path (default: energy_timeseries.dat)\n"
+        << "  -export-energy      Also export energy/CoM/RMS time series\n"
         << "  -benchmark          Run complete suite (scaling + schedules)\n"
         << "  -scaling            Run scaling analysis\n"
         << "  -schedules          Run schedule/chunk comparison\n"
@@ -167,8 +192,10 @@ int main(int argc, char** argv) {
     bool run_scaling = hasFlag(args, "-scaling");
     bool run_schedules = hasFlag(args, "-schedules");
     bool run_plot = hasFlag(args, "-plot");
+    bool run_simulation = hasFlag(args, "-simulate");
+    bool export_energy = hasFlag(args, "-export-energy");
 
-    if (!run_benchmark && !run_scaling && !run_schedules) {
+    if (!run_benchmark && !run_scaling && !run_schedules && !run_simulation) {
         run_benchmark = true;
     }
 
@@ -182,6 +209,8 @@ int main(int argc, char** argv) {
     int repetitions = 10;
     double dt = 0.01;
     unsigned int seed = 42;
+    int sim_steps = 1000;
+    int sim_sample_every = 10;
 
     std::vector<int> thread_counts{1, 2, 4, 8};
     int scaling_schedule = 0;
@@ -189,6 +218,8 @@ int main(int argc, char** argv) {
     std::vector<int> schedule_types{0, 1, 2};
     std::vector<int> schedule_chunks{1, 4, 16, 64};
     std::string output_prefix = "benchmark";
+    std::string trajectories_output = "trajectories.dat";
+    std::string energy_output = "energy_timeseries.dat";
 
     try {
         std::string value;
@@ -204,6 +235,12 @@ int main(int argc, char** argv) {
         if (getArgValue(args, "-seed", value)) {
             seed = static_cast<unsigned int>(std::stoul(value));
         }
+        if (getArgValue(args, "-steps", value)) {
+            sim_steps = std::max(0, std::stoi(value));
+        }
+        if (getArgValue(args, "-sample", value)) {
+            sim_sample_every = std::max(1, std::stoi(value));
+        }
         if (getArgValue(args, "-threads", value)) {
             thread_counts = parseIntCsv(value);
         }
@@ -218,6 +255,12 @@ int main(int argc, char** argv) {
         }
         if (getArgValue(args, "-output", value)) {
             output_prefix = value;
+        }
+        if (getArgValue(args, "-traj-output", value)) {
+            trajectories_output = value;
+        }
+        if (getArgValue(args, "-energy-output", value)) {
+            energy_output = value;
         }
     } catch (const std::exception& ex) {
         std::cerr << "Invalid argument value: " << ex.what() << "\n";
@@ -235,7 +278,7 @@ int main(int argc, char** argv) {
         schedule_chunks = {1, 4, 16, 64};
     }
 
-    const std::filesystem::path results_dir = std::filesystem::current_path().parent_path() / "Resultados";
+    const std::filesystem::path results_dir = std::filesystem::current_path() / "Resultados_Benchmark";
     std::error_code fs_error;
     std::filesystem::create_directories(results_dir, fs_error);
     if (fs_error) {
@@ -246,6 +289,35 @@ int main(int argc, char** argv) {
     const std::string output_base = (results_dir / output_prefix).string();
 
     const int schedule_threads = std::min(thread_counts.back(), maxThreads());
+
+    if (run_simulation) {
+        NBodySystem simulation_system = buildRandomSystem(n, G, eps, seed);
+        SimulationExportConfig export_config;
+        export_config.num_steps = sim_steps;
+        export_config.sample_every = sim_sample_every;
+        export_config.schedule_type = scaling_schedule;
+        export_config.chunk_size = scaling_chunk;
+        export_config.include_initial_state = true;
+        export_config.export_global_metrics = export_energy;
+
+        const bool ok = Visualizer::exportSimulationData(
+            simulation_system,
+            dt,
+            trajectories_output,
+            energy_output,
+            export_config
+        );
+
+        if (!ok) {
+            std::cerr << "Failed to export simulation data.\n";
+            return EXIT_FAILURE;
+        }
+
+        std::cout << "Generated: " << trajectories_output << '\n';
+        if (export_energy) {
+            std::cout << "Generated: " << energy_output << '\n';
+        }
+    }
 
     std::cout << "Benchmark configuration:\n"
               << "  N           = " << n << "\n"
