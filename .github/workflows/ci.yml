@@ -1,47 +1,77 @@
-name: Simulador N-Body CI/CD
+# 2/2 — On every code change: configure, build, and run tests inside the published
+# `:base` image from GHCR (same ref as build-base-container.yml).
+#
+# Job graph: ensure-base-image → build-and-test
+name: CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [main, master]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [main, master]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+permissions:
+  contents: read
+  packages: read
 
 jobs:
-  build-and-push-image:
+  ensure-base-image:
+    name: Verify GHCR base image exists
     runs-on: ubuntu-latest
-    
-    permissions:
-      contents: read
-      packages: write 
-
+    outputs:
+      image: ${{ steps.resolve.outputs.image }}
     steps:
-      - name: Checkout del código
-        uses: actions/checkout@v4
+      - id: resolve
+        name: Resolve GHCR image reference
+        run: |
+          repo_lc=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          img="ghcr.io/${repo_lc}:base"
+          echo "image=${img}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### CI base image"
+            echo "Expected image: \`${img}\`"
+            echo ""
+            echo "This job must pull that tag from GitHub Container Registry before **build-and-test** runs."
+            echo "The tag is created by the **build-base-container** workflow when \`Dockerfile\` changes on the default branch."
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Iniciar sesión en GitHub Container Registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extraer metadatos (tags, labels) para Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest
-            type=sha
+      - name: Pull base image from GHCR
+        run: |
+          IMAGE="${{ steps.resolve.outputs.image }}"
+          echo "Pulling: ${IMAGE}"
+          if docker pull "${IMAGE}"; then
+            echo "Base image is available."
+            exit 0
+          fi
+          echo ""
+          echo "::error title=Base image not found in GHCR::Could not pull \`${IMAGE}\`. Nothing was found at that tag (or the registry denied access)."
+          exit 1
 
-      - name: Construir y empujar imagen Docker (incluye make test)
-        uses: docker/build-push-action@v5
-        with:
-          context: ./nbody_2d
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+  build-and-test:
+    name: Build and test in container
+    needs: ensure-base-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.ensure-base-image.outputs.image }}
+      credentials:
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build project (Make)
+        working-directory: ./nbody_2d
+        run: make clean && make all
+
+      - name: Run Tests (Catch2)
+        working-directory: ./nbody_2d
+        run: make test
