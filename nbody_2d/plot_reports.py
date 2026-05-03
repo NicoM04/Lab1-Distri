@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Generate performance and physics reports from N-body .dat outputs."""
-
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Carga los datos de los archivos .dat generados por los benchmarks para luego generar gráficos PNG con matplotlib.
 
 def _load_rows(path: Path) -> List[List[str]]:
     rows: List[List[str]] = []
@@ -73,27 +72,49 @@ def load_trajectories(path: Path) -> Dict[int, Tuple[List[float], List[float]]]:
     return series
 
 
-def load_energy_drift(path: Path) -> Tuple[List[float], List[float]]:
+def load_energy_drift(path: Path) -> Tuple[List[float], List[float], List[float], List[float], List[float]]:
     rows = _load_rows(path)
     times: List[float] = []
+    kinetic: List[float] = []
+    potential: List[float] = []
+    total_energy: List[float] = []
     drift: List[float] = []
 
-    total_energy: List[float] = []
     for parts in rows:
         if len(parts) < 5:
             continue
         times.append(float(parts[1]))
+        kinetic.append(float(parts[2]))
+        potential.append(float(parts[3]))
         total_energy.append(float(parts[4]))
 
     if not total_energy:
-        return times, drift
+        return times, kinetic, potential, total_energy, drift
 
     e0 = total_energy[0]
     denom = abs(e0) if abs(e0) > 1e-18 else 1.0
     for e in total_energy:
         drift.append((e - e0) / denom)
 
-    return times, drift
+    return times, kinetic, potential, total_energy, drift
+
+
+def load_global_metrics(path: Path) -> Tuple[List[float], List[float], List[float], List[float]]:
+    rows = _load_rows(path)
+    times: List[float] = []
+    com_x: List[float] = []
+    com_y: List[float] = []
+    rms_radius: List[float] = []
+
+    for parts in rows:
+        if len(parts) < 7:
+            continue
+        times.append(float(parts[1]))
+        com_x.append(float(parts[5]))
+        com_y.append(float(parts[6]))
+        rms_radius.append(float(parts[7]))
+
+    return times, com_x, com_y, rms_radius
 
 
 def plot_performance(scaling_path: Path, schedules_path: Path, output_path: Path, plt) -> None:
@@ -124,7 +145,7 @@ def plot_performance(scaling_path: Path, schedules_path: Path, output_path: Path
         chunks = [item[0] for item in values]
         mean_times = [item[1] for item in values]
         ax_sched.plot(chunks, mean_times, "o-", linewidth=2, label=schedule_name)
-    ax_sched.set_title("Schedule Comparison by Chunk")
+    ax_sched.set_title("Execution Time vs Chunk Size (by Schedule)")
     ax_sched.set_xlabel("Chunk size")
     ax_sched.set_ylabel("Mean time [s]")
     ax_sched.grid(True, alpha=0.3)
@@ -134,7 +155,7 @@ def plot_performance(scaling_path: Path, schedules_path: Path, output_path: Path
     ax_amdahl.plot(threads, speedup, "o-", linewidth=2, label="Measured")
     ax_amdahl.plot(threads, amdahl, "s--", linewidth=2, label="Amdahl")
     ax_amdahl.fill_between(threads, amdahl, speedup, alpha=0.15, color="#2ca02c")
-    ax_amdahl.set_title("Amdahl Fit")
+    ax_amdahl.set_title("Amdahl Curve: Theoretical Prediction vs Measured Speedup")
     ax_amdahl.set_xlabel("Threads")
     ax_amdahl.set_ylabel("Speedup")
     ax_amdahl.grid(True, alpha=0.3)
@@ -146,28 +167,50 @@ def plot_performance(scaling_path: Path, schedules_path: Path, output_path: Path
 
 def plot_physics(trajectories_path: Path, energy_path: Path, output_path: Path, subset_bodies: int, plt) -> None:
     trajectories = load_trajectories(trajectories_path)
-    times, drift = load_energy_drift(energy_path)
+    times, kinetic, potential, total_energy, drift = load_energy_drift(energy_path)
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5), constrained_layout=True)
-    fig.suptitle("N-Body Physics Diagnostics", fontsize=16)
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12), constrained_layout=True)
+    fig.suptitle("N-Body", fontsize=16)
 
-    ax_traj = axes[0]
+    # Grafico 1: Trayectorias (arriba izquierda)
+    ax_traj = axes[0, 0]
     selected_ids = sorted(trajectories.keys())[: max(1, subset_bodies)]
     for body_id in selected_ids:
         xs, ys = trajectories[body_id]
-        ax_traj.plot(xs, ys, linewidth=1.6, label=f"body {body_id}")
-    ax_traj.set_title("Trajectories (subset)")
+        ax_traj.plot(xs, ys, linewidth=1.6, label=f"cuerpo {body_id}")
+    ax_traj.set_title("Posiciones de un subconjunto de cuerpos en el tiempo")
     ax_traj.set_xlabel("x")
     ax_traj.set_ylabel("y")
     ax_traj.grid(True, alpha=0.3)
     if len(selected_ids) <= 12:
         ax_traj.legend(ncol=2, fontsize=8)
 
-    ax_drift = axes[1]
+    # Grafico 2: Energía total en el tiempo (arriba derecha)
+    ax_total = axes[0, 1]
+    ax_total.plot(times, total_energy, color="#1f77b4", linewidth=2, label="Total E = K + U")
+    ax_total.set_title("Energía Total vs Time")
+    ax_total.set_xlabel("tiempo")
+    ax_total.set_ylabel("E")
+    ax_total.grid(True, alpha=0.3)
+    ax_total.legend()
+
+    # Grafico 3: Energías cinética y potencial (abajo izquierda)
+    ax_components = axes[1, 0]
+    ax_components.plot(times, kinetic, color="#2ca02c", linewidth=2, label="Energía Cinética (K)")
+    ax_components.plot(times, potential, color="#ff7f0e", linewidth=2, label="Energía Potencial (U)")
+    ax_components.plot(times, total_energy, color="#d62728", linewidth=2.5, linestyle="--", label="Total (K+U)")
+    ax_components.set_title("E, K, U vs Tiempo")
+    ax_components.set_xlabel("tiempo")
+    ax_components.set_ylabel("energía")
+    ax_components.grid(True, alpha=0.3)
+    ax_components.legend()
+
+    # Grafico 4: Energía Total Drift (abajo derecha)
+    ax_drift = axes[1, 1]
     ax_drift.plot(times, drift, color="#d62728", linewidth=2)
     ax_drift.axhline(0.0, color="black", linewidth=1, alpha=0.7)
-    ax_drift.set_title("Total Energy Drift")
-    ax_drift.set_xlabel("time")
+    ax_drift.set_title("Energía Total Drift (relativa al valor inicial)")
+    ax_drift.set_xlabel("tiempo")
     ax_drift.set_ylabel("(E(t)-E0)/|E0|")
     ax_drift.grid(True, alpha=0.3)
 

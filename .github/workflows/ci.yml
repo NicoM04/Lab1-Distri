@@ -1,19 +1,47 @@
-name: C++ CI
+name: Simulador N-Body CI/CD
 
 on:
   push:
+    branches: [ "main", "master" ]
   pull_request:
+    branches: [ "main", "master" ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-test:
+  build-and-push-image:
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write 
 
     steps:
-      - name: Checkout
+      - name: Checkout del código
         uses: actions/checkout@v4
 
-      - name: Build
-        run: make -C nbody_2d
+      - name: Iniciar sesión en GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run basic acceleration check
-        run: ./nbody_2d/nbody_2d
+      - name: Extraer metadatos (tags, labels) para Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Construir y empujar imagen Docker (incluye make test)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./nbody_2d
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
