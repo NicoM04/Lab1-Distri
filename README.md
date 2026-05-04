@@ -1,6 +1,6 @@
 # N-Body 2D con OpenMP
 
-Simulador 2D de N-cuerpos en C++17 con soporte OpenMP, integración Euler y un módulo de benchmarks para análisis de scaling, comparación de schedules, eficiencia y Ley de Amdahl.
+Simulador 2D de N-cuerpos en C++17 con soporte OpenMP, integración Euler y un módulo de benchmarks para análisis de scaling, comparación de schedules, eficiencia y Ley de Amdahl. El proyecto cuenta con un pipeline de Integración Continua (CI) completamente dockerizado.
 
 ## Descripción del proyecto
 
@@ -13,13 +13,55 @@ El proyecto está organizado en `nbody_2d/` y contiene:
 - `Benchmark`: medición de tiempo, estadísticas, speedup, eficiencia, Amdahl y exportación a `.dat`.
 - `plot_reports.py`: script externo en Python para generar gráficos PNG.
 
-## Requisitos previos
+## Ejecución con Docker
+
+Usando GitHub Container Registry (GHCR) no será necesario que instales dependencias locales (C++, Python, Matplotlib, Catch2) para ejecutar. Todo está empaquetado en una imagen base.
+
+**Requisito único:** Tener [Docker](https://docs.docker.com/get-docker/) instalado.
+
+### 1. Descargar la imagen base
+```bash
+docker pull ghcr.io/nicom04/lab1-distri:base
+```
+
+### 2. Ejección usando el contenedor
+Estando en la carpeta `/nbody_2d`, utiliza los siguientes comandos. Los volúmenes (-v) aseguran que los gráficos generados se muestre en la máquina local.
+
+**Generar los Benchmarks y las Gráficos de Rendimiento**:
+```bash
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/nicom04/lab1-distri:base bash -c "make benchmark"
+```
+
+**Generar el Análisis Físico y las Trayectorias**:
+```bash
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/nicom04/lab1-distri:base bash -c "make analysis"
+```
+
+**Ejecutar los Tests Unitarios**:
+```bash
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/nicom04/lab1-distri:base bash -c "make clean && make all && make test"
+```
+
+Los archivos generados aparecerán directamente en tu carpeta de Windows/WSL. Busca la carpeta `Resultados_Benchmark` y `Resultados_Analisis` localmente.
+
+## Integración Continua (CI/CD)
+
+El proyecto utiliza **GitHub Actions** :
+
+1. **Toolchain Image** (`build-base-container`): Construye y publica automáticamente una imagen Docker con las herramientas necesarias a GHCR cuando se modifica el `Dockerfile`.
+
+2. **CI Flow** (`ci.yml`): En cada `push` o `Pull Request` al código fuente, se inyecta el código en la imagen base y se ejecuta `make test` en un entorno limpio para prevenir regresiones.
+
+
+
+## Requisitos previos para ejecución Local
 
 Para compilar y ejecutar el proyecto necesitas:
 
-- **Compilador C++17**: g++ o clang con soporte OpenMP
-- **Python 3** (opcional, solo para generar gráficos): `python3`
-- **Matplotlib** (opcional): `pip install matplotlib`
+- **Compilador C++17**: g++ o clang con soporte OpenMP.
+- **Catch2 (v3)**: Para las pruebas unitarias.
+- **Python 3** (opcional, solo para generar gráficos): `python3`.
+- **Matplotlib** (opcional): `pip install matplotlib`.
 
 ```bash
 # Verificar que tienes g++ y OpenMP
@@ -37,8 +79,8 @@ Desde la carpeta `nbody_2d/`:
 
 ```bash
 make                 # Compila el ejecutable nbody_2d
-make benchmark       # Ejecuta todos los benchmarks y genera performance_plots.png en Resultados_Benchmark/
-make analysis        # Ejecuta la simulación y genera physics_plots.png en Resultados_Analisis/
+make benchmark       # Ejecuta todos los benchmarks y genera Resultados_Benchmark/
+make analysis        # Ejecuta la simulación y genera Resultados_Analisis/
 make test            # Compila y ejecuta los tests unitarios con Catch2
 make clean           # Limpia archivos compilados
 ```
