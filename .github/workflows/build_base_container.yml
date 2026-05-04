@@ -9,11 +9,11 @@ on:
   push:
     branches: [main, master]
     paths:
-      - Dockerfile
+      - 'nbody_2d/Dockerfile'
   pull_request:
     branches: [main, master]
     paths:
-      - Dockerfile
+      - 'nbody_2d/Dockerfile'
 
 env:
   REGISTRY: ghcr.io
@@ -49,8 +49,8 @@ jobs:
       - name: Build and push base image
         uses: docker/build-push-action@v5
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./nbody_2d
+          file: ./nbody_2d/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ env.IMAGE }}
           cache-from: type=registry,ref=${{ env.IMAGE }}
@@ -69,7 +69,7 @@ jobs:
             IMG="${IMAGE}"
           else
             echo "PR build: using a local image tag (nothing pushed to GHCR yet)."
-            if ! docker build -t ci-base-local -f Dockerfile .; then
+            if ! docker build -t ci-base-local -f nbody_2d/Dockerfile ./nbody_2d; then
               echo "::error::Docker build failed. Fix the Dockerfile before merging."
               exit 1
             fi

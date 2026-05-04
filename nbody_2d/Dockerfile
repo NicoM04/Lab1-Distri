@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-matplotlib \
     && rm -rf /var/lib/apt/lists/*
 
-# Catch2.
+# Catch2 (tests).
 RUN cd /tmp && \
     git clone --depth 1 --branch v3.4.0 https://github.com/catchorg/Catch2.git && \
     cd Catch2 && \
