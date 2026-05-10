@@ -45,13 +45,8 @@ benchmark: $(TARGET)
 	mkdir -p Resultados_Benchmark
 # 1) Benchmark completo
 	./$(TARGET) -benchmark -output benchmark_full
-# 2) Scaling
-	./$(TARGET) -scaling -N 4000 -iters 10 -threads 1,2,4,8 -schedule static -chunk 16 -output wk4_scaling
-# 3) Comparación de schedules
-	./$(TARGET) -schedules -N 4000 -iters 10 -threads 1,2,4,8 -chunks 1,4,16,64 -output wk4_schedules
-# 4) Generación automática de gráficos (plot)
-	./$(TARGET) -scaling -N 4000 -iters 10 -threads 1,2,4,8 -schedule static -chunk 16 -output wk4 -plot
-# 5) Generar performance_plots.png
+
+# 2) Generar performance_plots.png
 	python3 plot_reports.py --scaling Resultados_Benchmark/benchmark_full_scaling.dat --schedules Resultados_Benchmark/benchmark_full_schedules.dat --performance-output Resultados_Benchmark/performance_plots.png
 
 # --- ANALYSIS ---
