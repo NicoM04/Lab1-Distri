@@ -49,12 +49,13 @@ benchmark: $(TARGET)
 # 2) Generar performance_plots.png
 	python3 plot_reports.py --scaling Resultados_Benchmark/benchmark_full_scaling.dat --schedules Resultados_Benchmark/benchmark_full_schedules.dat --performance-output Resultados_Benchmark/performance_plots.png
 
-# --- ANALYSIS ---
+# --- ANALYSIS --- 
+# Se usa la misma configuración que del primer experimento del benchmark para generar datos comparables
 # Genera trayectorias/energía y physics_plots.png
 analysis: $(TARGET)
 	mkdir -p Resultados_Analisis
 # Genera trayectorias y energía
-	./$(TARGET) -simulate -steps 1000 -sample 10 -traj-output Resultados_Analisis/trajectories.dat -export-energy -energy-output Resultados_Analisis/energy_timeseries.dat
+	./$(TARGET) -simulate -N 1000 -iters 10 -dt 0.01 -seed 42 -steps 1000 -sample 10 -traj-output Resultados_Analisis/trajectories.dat -export-energy -energy-output Resultados_Analisis/energy_timeseries.dat
 # Generar physics_plots.png
 	python3 plot_reports.py --trajectories Resultados_Analisis/trajectories.dat --energy Resultados_Analisis/energy_timeseries.dat --physics-output Resultados_Analisis/physics_plots.png --subset-bodies 12
 

@@ -13,6 +13,16 @@ El proyecto está organizado en `nbody_2d/` y contiene:
 - `Benchmark`: medición de tiempo, estadísticas, speedup, eficiencia, Amdahl y exportación a `.dat`.
 - `plot_reports.py`: script externo en Python para generar gráficos PNG.
 
+## Roles del equipo
+
+| Rol | Encargado |
+|---|---|
+| Modelo y Datos | Nicolás Morales |
+| Núcleo paralelo | Gabriel Cabrera |
+| Integración y Física | Amaru Monje |
+| Métricas y Benchmark | Francisco Riquelme |
+| Calidad, CI y visualización | Thomas Gustafsson |
+
 ## Ejecución con Docker
 
 Usando GitHub Container Registry (GHCR) no será necesario que instales dependencias locales (C++, Python, Matplotlib, Catch2) para ejecutar. Todo está empaquetado en una imagen base.
@@ -96,10 +106,10 @@ make benchmark
 ```
 
 **Qué hace:**
-1. **Benchmark completo** (`-benchmark`): Mide el tiempo base del simulador con configuración predeterminada
-2. **Análisis de scaling** (`-scaling`): Prueba con 1, 2, 4 y 8 hilos para medir speedup y eficiencia
-3. **Comparación de schedules** (`-schedules`): Compara diferentes estrategias de distribución de trabajo (static, dynamic, guided) con diferentes tamaños de chunk
-4. **Generación de gráficos** (`-plot`): Ejecuta el script Python para generar visualizaciones
+1. **Benchmark completo** (`-benchmark`): Mide el tiempo base del simulador con configuración predeterminada.
+2. **Análisis de scaling** (`-scaling`): Prueba con 1, 2, 4 y 8 hilos para medir speedup y eficiencia.
+3. **Comparación de schedules** (`-schedules`): Compara diferentes estrategias de distribución de trabajo (static, dynamic, guided) con diferentes tamaños de chunk.
+4. **Generación de gráficos** (`-plot`): Ejecuta el script Python para generar visualizaciones.
 
 **Salidas generadas en `Resultados_Benchmark/`:**
 - `benchmark_full_scaling.dat`: Datos de tiempo y speedup
@@ -127,6 +137,16 @@ make analysis
 - `energy_timeseries.dat`: Energía cinética, potencial y total en cada paso
 - `physics_plots.png`: Gráfico de trayectorias 2D y evolución de energía
 
+**Parámetros por defecto**
+
+Se toma la "misma" configuración que para el `make Benchmark`.
+- N = 1000
+- iters = 10
+- dt = 0.01
+- seed = 42
+- steps = 1000
+ -sample = 10
+- subset-bodies = 12
 ---
 
 ### `make test` (Tests unitarios)
@@ -260,11 +280,3 @@ El benchmark estima la fracción serial $f$ a partir de resultados medidos y cal
 $$S_p = \frac{1}{f + \frac{1-f}{p}}$$
 
 Ese valor teórico se exporta junto a los datos medidos para comparar escalabilidad real vs esperada.
-
-## Notas
-
-- El proyecto conserva compatibilidad con los comandos existentes
-- La lógica física del simulador no se modifica
-- Los gráficos se generan a partir de los `.dat` ya exportados
-- Los resultados se organizan en carpetas separadas: `Resultados_Benchmark/` y `Resultados_Analisis/`
-
