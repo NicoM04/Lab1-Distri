@@ -4,15 +4,16 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
 
 namespace {
 
-bool approximatelyEqual(
-    double actual,
-    double expected,
-    double relativeTolerance = 1e-4,
-    double absoluteTolerance = 1e-8
-) {
+constexpr double gravitationalConstant = 1.0;
+constexpr double epsilon = 0.1;
+constexpr double relativeTolerance = 1e-4;
+constexpr double absoluteTolerance = 1e-8;
+
+bool approximatelyEqual(double actual, double expected) {
     const double difference = std::abs(actual - expected);
 
     return difference
@@ -20,17 +21,78 @@ bool approximatelyEqual(
         + relativeTolerance * std::abs(expected);
 }
 
-} // namespace
+void computeAccelerationsCpu(
+    const std::vector<double>& mass,
+    const std::vector<double>& x,
+    const std::vector<double>& y,
+    std::vector<double>& ax,
+    std::vector<double>& ay
+) {
+    const std::size_t n = mass.size();
+    const double epsilonSquared = epsilon * epsilon;
 
-int main() {
-    constexpr std::size_t n = 2;
+    for (std::size_t i = 0; i < n; ++i) {
+        double accelerationX = 0.0;
+        double accelerationY = 0.0;
 
-    const double hMass[n] = {1.0, 1.0};
-    const double hX[n] = {0.0, 1.0};
-    const double hY[n] = {0.0, 0.0};
+        for (std::size_t j = 0; j < n; ++j) {
+            if (i == j) {
+                continue;
+            }
 
-    double hAx[n] = {0.0, 0.0};
-    double hAy[n] = {0.0, 0.0};
+            const double dx = x[j] - x[i];
+            const double dy = y[j] - y[i];
+
+            const double distanceSquared =
+                dx * dx
+                + dy * dy
+                + epsilonSquared;
+
+            const double inverseDistance =
+                1.0 / std::sqrt(distanceSquared);
+
+            const double inverseDistanceCubed =
+                inverseDistance
+                * inverseDistance
+                * inverseDistance;
+
+            const double factor =
+                gravitationalConstant
+                * mass[j]
+                * inverseDistanceCubed;
+
+            accelerationX += factor * dx;
+            accelerationY += factor * dy;
+        }
+
+        ax[i] = accelerationX;
+        ay[i] = accelerationY;
+    }
+}
+
+bool runTestCase(std::size_t n, int blockSize) {
+    std::vector<double> mass(n);
+    std::vector<double> x(n);
+    std::vector<double> y(n);
+
+    for (std::size_t i = 0; i < n; ++i) {
+        mass[i] = 1.0 + 0.05 * static_cast<double>(i);
+        x[i] = 0.25 * static_cast<double>(i);
+        y[i] = 0.10 * static_cast<double>(i % 5);
+    }
+
+    std::vector<double> cpuAx(n, 0.0);
+    std::vector<double> cpuAy(n, 0.0);
+    std::vector<double> gpuAx(n, 0.0);
+    std::vector<double> gpuAy(n, 0.0);
+
+    computeAccelerationsCpu(
+        mass,
+        x,
+        y,
+        cpuAx,
+        cpuAy
+    );
 
     double* dMass = nullptr;
     double* dX = nullptr;
@@ -48,21 +110,21 @@ int main() {
 
     CUDA_CHECK(cudaMemcpy(
         dMass,
-        hMass,
+        mass.data(),
         bytes,
         cudaMemcpyHostToDevice
     ));
 
     CUDA_CHECK(cudaMemcpy(
         dX,
-        hX,
+        x.data(),
         bytes,
         cudaMemcpyHostToDevice
     ));
 
     CUDA_CHECK(cudaMemcpy(
         dY,
-        hY,
+        y.data(),
         bytes,
         cudaMemcpyHostToDevice
     ));
@@ -74,22 +136,22 @@ int main() {
         dAx,
         dAy,
         n,
-        1.0,
-        0.1,
-        64
+        gravitationalConstant,
+        epsilon,
+        blockSize
     );
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
     CUDA_CHECK(cudaMemcpy(
-        hAx,
+        gpuAx.data(),
         dAx,
         bytes,
         cudaMemcpyDeviceToHost
     ));
 
     CUDA_CHECK(cudaMemcpy(
-        hAy,
+        gpuAy.data(),
         dAy,
         bytes,
         cudaMemcpyDeviceToHost
@@ -101,37 +163,64 @@ int main() {
     CUDA_CHECK(cudaFree(dAx));
     CUDA_CHECK(cudaFree(dAy));
 
-    const double expectedAcceleration =
-        1.0 / std::pow(1.0 + 0.1 * 0.1, 1.5);
+    for (std::size_t i = 0; i < n; ++i) {
+        const bool accelerationXCorrect =
+            approximatelyEqual(gpuAx[i], cpuAx[i]);
 
-    const bool firstBodyCorrect =
-        approximatelyEqual(hAx[0], expectedAcceleration)
-        && approximatelyEqual(hAy[0], 0.0);
+        const bool accelerationYCorrect =
+            approximatelyEqual(gpuAy[i], cpuAy[i]);
 
-    const bool secondBodyCorrect =
-        approximatelyEqual(hAx[1], -expectedAcceleration)
-        && approximatelyEqual(hAy[1], 0.0);
+        if (!accelerationXCorrect || !accelerationYCorrect) {
+            std::cerr
+                << "Fallo con N = " << n
+                << ", blockSize = " << blockSize
+                << ", cuerpo i = " << i << '\n'
+                << "CPU: ax = " << cpuAx[i]
+                << ", ay = " << cpuAy[i] << '\n'
+                << "GPU: ax = " << gpuAx[i]
+                << ", ay = " << gpuAy[i] << '\n';
 
-    if (!firstBodyCorrect || !secondBodyCorrect) {
+            return false;
+        }
+    }
+
+    std::cout
+        << "PASS: N = " << n
+        << ", blockSize = " << blockSize
+        << '\n';
+
+    return true;
+}
+
+} // namespace
+
+int main() {
+    bool allTestsPassed = true;
+
+    allTestsPassed &=
+        runTestCase(2, 64);
+
+    allTestsPassed &=
+        runTestCase(3, 64);
+
+    allTestsPassed &=
+        runTestCase(31, 16);
+
+    allTestsPassed &=
+        runTestCase(32, 16);
+
+    allTestsPassed &=
+        runTestCase(33, 16);
+
+    if (!allTestsPassed) {
         std::cerr
-            << "Prueba GPU fallida\n"
-            << "Cuerpo 0: ax = " << hAx[0]
-            << ", ay = " << hAy[0] << '\n'
-            << "Cuerpo 1: ax = " << hAx[1]
-            << ", ay = " << hAy[1] << '\n'
-            << "Esperado: +/-"
-            << expectedAcceleration
-            << '\n';
+            << "Kernel CUDA basico: FAIL\n";
 
         return EXIT_FAILURE;
     }
 
     std::cout
-        << "Kernel CUDA basico: PASS\n"
-        << "Cuerpo 0: ax = " << hAx[0]
-        << ", ay = " << hAy[0] << '\n'
-        << "Cuerpo 1: ax = " << hAx[1]
-        << ", ay = " << hAy[1] << '\n';
+        << "Kernel CUDA basico: TODOS LOS CASOS PASS\n";
 
     return EXIT_SUCCESS;
 }
