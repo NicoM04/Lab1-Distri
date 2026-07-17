@@ -309,7 +309,95 @@ bool testInvalidVariant() {
     return false;
 }
 
+bool testInvalidBlockSize() {
+    try {
+        launchComputeAccelerations(
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            1,
+            gravitationalConstant,
+            epsilon,
+            0,
+            0
+        );
+    } catch (const std::invalid_argument&) {
+        std::cout
+            << "PASS: blockSize invalido detectado\n";
+
+        return true;
+    }
+
+    std::cerr
+        << "FAIL: no se detecto blockSize invalido\n";
+
+    return false;
+}
+
+bool testNullPointers() {
+    try {
+        launchComputeAccelerations(
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            1,
+            gravitationalConstant,
+            epsilon,
+            0,
+            64
+        );
+    } catch (const std::invalid_argument&) {
+        std::cout
+            << "PASS: punteros device nulos detectados\n";
+
+        return true;
+    }
+
+    std::cerr
+        << "FAIL: no se detectaron punteros device nulos\n";
+
+    return false;
+}
+
+bool testZeroBodies() {
+    try {
+        launchComputeAccelerations(
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            0,
+            gravitationalConstant,
+            epsilon,
+            0,
+            64
+        );
+    } catch (...) {
+        std::cerr
+            << "FAIL: N = 0 no deberia lanzar una excepcion\n";
+
+        return false;
+    }
+
+    std::cout
+        << "PASS: N = 0 retorna sin lanzar kernel\n";
+
+    return true;
+}
+
+
+
+
+
 } // namespace
+
+
+
 
 int main() {
     bool allTestsPassed = true;
@@ -319,8 +407,16 @@ int main() {
     allTestsPassed &= runTestCase(31, 16);
     allTestsPassed &= runTestCase(32, 16);
     allTestsPassed &= runTestCase(33, 16);
+    allTestsPassed &= runTestCase(33, 64);
+    allTestsPassed &= runTestCase(33, 128);
+    allTestsPassed &= runTestCase(33, 256);
+    allTestsPassed &= runTestCase(33, 512);
+    allTestsPassed &= runTestCase(33, 1024);
 
     allTestsPassed &= testInvalidVariant();
+    allTestsPassed &= testInvalidBlockSize();
+    allTestsPassed &= testNullPointers();
+    allTestsPassed &= testZeroBodies();
 
     if (!allTestsPassed) {
         std::cerr
