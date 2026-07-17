@@ -2,6 +2,26 @@
 
 #include <cstddef>
 
+
+/**
+ * Contrato de integracion con la capa de memoria del Rol 2:
+ *
+ * - d_mass, d_x y d_y deben apuntar a arreglos de al menos
+ *   n elementos double en memoria device.
+ * - d_ax y d_ay deben apuntar a arreglos de al menos
+ *   n elementos double en memoria device.
+ * - Los lanzadores no reservan ni liberan memoria.
+ * - Los lanzadores no realizan copias H2D o D2H.
+ * - Los lanzadores no llaman cudaDeviceSynchronize().
+ * - La capa que invoca el kernel controla la vida de los
+ *   buffers, las transferencias y la sincronizacion.
+ * - variant 0 selecciona el kernel basico.
+ * - variant 1 selecciona el kernel shared.
+ */
+
+
+
+
 /**
  * Lanza el kernel basico de aceleraciones.
  *
