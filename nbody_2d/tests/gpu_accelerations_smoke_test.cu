@@ -70,6 +70,40 @@ void computeAccelerationsCpu(
     }
 }
 
+bool compareResults(
+    const std::vector<double>& expectedAx,
+    const std::vector<double>& expectedAy,
+    const std::vector<double>& actualAx,
+    const std::vector<double>& actualAy,
+    std::size_t n,
+    int blockSize,
+    const char* comparisonName
+) {
+    for (std::size_t i = 0; i < n; ++i) {
+        const bool accelerationXCorrect =
+            approximatelyEqual(actualAx[i], expectedAx[i]);
+
+        const bool accelerationYCorrect =
+            approximatelyEqual(actualAy[i], expectedAy[i]);
+
+        if (!accelerationXCorrect || !accelerationYCorrect) {
+            std::cerr
+                << "Fallo en " << comparisonName << '\n'
+                << "N = " << n
+                << ", blockSize = " << blockSize
+                << ", cuerpo i = " << i << '\n'
+                << "Esperado: ax = " << expectedAx[i]
+                << ", ay = " << expectedAy[i] << '\n'
+                << "Obtenido: ax = " << actualAx[i]
+                << ", ay = " << actualAy[i] << '\n';
+
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool runTestCase(std::size_t n, int blockSize) {
     std::vector<double> mass(n);
     std::vector<double> x(n);
@@ -83,8 +117,12 @@ bool runTestCase(std::size_t n, int blockSize) {
 
     std::vector<double> cpuAx(n, 0.0);
     std::vector<double> cpuAy(n, 0.0);
-    std::vector<double> gpuAx(n, 0.0);
-    std::vector<double> gpuAy(n, 0.0);
+
+    std::vector<double> basicAx(n, 0.0);
+    std::vector<double> basicAy(n, 0.0);
+
+    std::vector<double> sharedAx(n, 0.0);
+    std::vector<double> sharedAy(n, 0.0);
 
     computeAccelerationsCpu(
         mass,
@@ -129,7 +167,8 @@ bool runTestCase(std::size_t n, int blockSize) {
         cudaMemcpyHostToDevice
     ));
 
-    launchComputeAccelerationsBasic(
+    // Variante 0: kernel basico.
+    launchComputeAccelerations(
         dMass,
         dX,
         dY,
@@ -138,20 +177,51 @@ bool runTestCase(std::size_t n, int blockSize) {
         n,
         gravitationalConstant,
         epsilon,
+        0,
         blockSize
     );
 
     CUDA_CHECK(cudaDeviceSynchronize());
 
     CUDA_CHECK(cudaMemcpy(
-        gpuAx.data(),
+        basicAx.data(),
         dAx,
         bytes,
         cudaMemcpyDeviceToHost
     ));
 
     CUDA_CHECK(cudaMemcpy(
-        gpuAy.data(),
+        basicAy.data(),
+        dAy,
+        bytes,
+        cudaMemcpyDeviceToHost
+    ));
+
+    // Variante 1: kernel con shared memory.
+    launchComputeAccelerations(
+        dMass,
+        dX,
+        dY,
+        dAx,
+        dAy,
+        n,
+        gravitationalConstant,
+        epsilon,
+        1,
+        blockSize
+    );
+
+    CUDA_CHECK(cudaDeviceSynchronize());
+
+    CUDA_CHECK(cudaMemcpy(
+        sharedAx.data(),
+        dAx,
+        bytes,
+        cudaMemcpyDeviceToHost
+    ));
+
+    CUDA_CHECK(cudaMemcpy(
+        sharedAy.data(),
         dAy,
         bytes,
         cudaMemcpyDeviceToHost
@@ -163,33 +233,80 @@ bool runTestCase(std::size_t n, int blockSize) {
     CUDA_CHECK(cudaFree(dAx));
     CUDA_CHECK(cudaFree(dAy));
 
-    for (std::size_t i = 0; i < n; ++i) {
-        const bool accelerationXCorrect =
-            approximatelyEqual(gpuAx[i], cpuAx[i]);
+    const bool basicMatchesCpu =
+        compareResults(
+            cpuAx,
+            cpuAy,
+            basicAx,
+            basicAy,
+            n,
+            blockSize,
+            "CPU vs kernel basico"
+        );
 
-        const bool accelerationYCorrect =
-            approximatelyEqual(gpuAy[i], cpuAy[i]);
+    const bool sharedMatchesCpu =
+        compareResults(
+            cpuAx,
+            cpuAy,
+            sharedAx,
+            sharedAy,
+            n,
+            blockSize,
+            "CPU vs kernel shared"
+        );
 
-        if (!accelerationXCorrect || !accelerationYCorrect) {
-            std::cerr
-                << "Fallo con N = " << n
-                << ", blockSize = " << blockSize
-                << ", cuerpo i = " << i << '\n'
-                << "CPU: ax = " << cpuAx[i]
-                << ", ay = " << cpuAy[i] << '\n'
-                << "GPU: ax = " << gpuAx[i]
-                << ", ay = " << gpuAy[i] << '\n';
+    const bool sharedMatchesBasic =
+        compareResults(
+            basicAx,
+            basicAy,
+            sharedAx,
+            sharedAy,
+            n,
+            blockSize,
+            "kernel basico vs kernel shared"
+        );
 
-            return false;
-        }
+    if (
+        !basicMatchesCpu
+        || !sharedMatchesCpu
+        || !sharedMatchesBasic
+    ) {
+        return false;
     }
 
     std::cout
         << "PASS: N = " << n
         << ", blockSize = " << blockSize
-        << '\n';
+        << ", variantes basica y shared\n";
 
     return true;
+}
+
+bool testInvalidVariant() {
+    try {
+        launchComputeAccelerations(
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            1,
+            gravitationalConstant,
+            epsilon,
+            2,
+            64
+        );
+    } catch (const std::invalid_argument&) {
+        std::cout
+            << "PASS: variante CUDA invalida detectada\n";
+
+        return true;
+    }
+
+    std::cerr
+        << "FAIL: no se detecto la variante CUDA invalida\n";
+
+    return false;
 }
 
 } // namespace
@@ -197,30 +314,24 @@ bool runTestCase(std::size_t n, int blockSize) {
 int main() {
     bool allTestsPassed = true;
 
-    allTestsPassed &=
-        runTestCase(2, 64);
+    allTestsPassed &= runTestCase(2, 64);
+    allTestsPassed &= runTestCase(3, 64);
+    allTestsPassed &= runTestCase(31, 16);
+    allTestsPassed &= runTestCase(32, 16);
+    allTestsPassed &= runTestCase(33, 16);
 
-    allTestsPassed &=
-        runTestCase(3, 64);
-
-    allTestsPassed &=
-        runTestCase(31, 16);
-
-    allTestsPassed &=
-        runTestCase(32, 16);
-
-    allTestsPassed &=
-        runTestCase(33, 16);
+    allTestsPassed &= testInvalidVariant();
 
     if (!allTestsPassed) {
         std::cerr
-            << "Kernel CUDA basico: FAIL\n";
+            << "Kernels CUDA de aceleraciones: FAIL\n";
 
         return EXIT_FAILURE;
     }
 
     std::cout
-        << "Kernel CUDA basico: TODOS LOS CASOS PASS\n";
+        << "Kernels CUDA basico y shared: "
+        << "TODOS LOS CASOS PASS\n";
 
     return EXIT_SUCCESS;
 }
