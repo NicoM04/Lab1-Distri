@@ -1,12 +1,13 @@
 CXX = g++
-NVCC = nvcc
+CUDA_HOME ?= /usr/local/cuda
+NVCC = $(CUDA_HOME)/bin/nvcc
 
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp -I. -Itests -I$(CUDA_HOME)/include
 
 # Arquitectura CUDA configurable.
-# RTX 3050 Laptop GPU: compute capability 8.6.
-CUDA_ARCH ?= 86
-NVCCFLAGS = -O3 -std=c++17 -arch=sm_$(CUDA_ARCH) -Xcompiler=-Wall,-Wextra
+# GTX 1650: compute capability 7.5.
+CUDA_ARCH ?= 75
+NVCCFLAGS = -O3 -std=c++17 -arch=sm_$(CUDA_ARCH) -Xcompiler=-Wall,-Wextra -I. -Itests -I$(CUDA_HOME)/include
 
 # Librerías de Catch2 v3
 TEST_LIBS = -lCatch2Main -lCatch2
@@ -14,6 +15,7 @@ TEST_LIBS = -lCatch2Main -lCatch2
 TARGET = nbody_2d
 TEST_TARGET = run_tests
 CUDA_TEST_TARGET = gpu_accelerations_smoke_test
+CUDA_BUFFER_TEST_TARGET = cuda_buffer_roundtrip_test
 
 # --- ARCHIVOS FUENTE ---
 
@@ -43,6 +45,8 @@ TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 # Test CUDA del Rol 1
 CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
                  kernels/accelerations.cu
+
+CUDA_BUFFER_TEST_SRCS = tests/cuda_buffer_roundtrip_test.cu
 
 .PHONY: all clean run test cuda-test test-all benchmark analysis
 
@@ -105,8 +109,14 @@ $(CUDA_TEST_TARGET): $(CUDA_TEST_SRCS) \
                      kernels/accelerations.cuh
 	$(NVCC) $(NVCCFLAGS) $(CUDA_TEST_SRCS) -o $@
 
-cuda-test: $(CUDA_TEST_TARGET)
+$(CUDA_BUFFER_TEST_TARGET): $(CUDA_BUFFER_TEST_SRCS) \
+                            CudaBuffer.h \
+                            CudaCheck.cuh
+	$(NVCC) $(NVCCFLAGS) $(CUDA_BUFFER_TEST_SRCS) -o $@
+
+cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
+	./$(CUDA_BUFFER_TEST_TARGET)
 
 # Ejecuta primero los tests CPU y luego los tests CUDA.
 test-all: test cuda-test

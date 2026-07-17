@@ -22,8 +22,7 @@ inline void cudaCheckImpl(
             << ':'
             << line
             << '\n';
-
-        std::exit(EXIT_FAILURE);
+        std::abort();
     }
 }
 

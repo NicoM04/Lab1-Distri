@@ -56,6 +56,11 @@ void Integrator::eulerStep(NBodySystem& system, double dt, int sync_type) {
             bodies[i].drift(dt);
         }
     }
+
+    if (system.hasDeviceMemory()) {
+        system.markHostStateDirty();
+        system.uploadStateToDevice();
+    }
 }
 
 void Integrator::eulerStep(NBodySystem& system, double dt, bool use_barrier) {
@@ -78,5 +83,10 @@ void Integrator::eulerStep(NBodySystem& system, double dt, bool use_barrier) {
         for (int i = 0; i < n; ++i) {
             bodies[i].drift(dt);
         }
+    }
+
+    if (system.hasDeviceMemory()) {
+        system.markHostStateDirty();
+        system.uploadStateToDevice();
     }
 }
