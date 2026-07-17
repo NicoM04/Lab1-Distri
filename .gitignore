@@ -34,3 +34,5 @@ Resultados/
 # Windows
 Thumbs.db
 desktop.ini
+nbody_2d/run_tests
+nbody_2d/gpu_accelerations_smoke_test
