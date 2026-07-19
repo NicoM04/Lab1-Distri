@@ -4,6 +4,15 @@
 *.so
 nbody_2d/nbody_2d
 nbody_2d/tests/test_acceleration
+nbody_2d/*.o
+nbody_2d/tests/*.o
+nbody_2d/run_tests
+
+# Tests de CUDA
+nbody_2d/gpu_accelerations_smoke_test
+nbody_2d/cuda_buffer_roundtrip_test
+nbody_2d/gpu_integration_test
+nbody_2d/gpu_energy_test
 
 # Build artifacts genéricos
 build/
@@ -34,5 +43,3 @@ Resultados/
 # Windows
 Thumbs.db
 desktop.ini
-nbody_2d/run_tests
-nbody_2d/gpu_accelerations_smoke_test
