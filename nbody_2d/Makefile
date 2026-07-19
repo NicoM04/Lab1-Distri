@@ -17,6 +17,7 @@ TEST_TARGET = run_tests
 CUDA_TEST_TARGET = gpu_accelerations_smoke_test
 CUDA_BUFFER_TEST_TARGET = cuda_buffer_roundtrip_test
 CUDA_INTEGRATION_TEST_TARGET = gpu_integration_test
+CUDA_ENERGY_TEST_TARGET = gpu_energy_test
 
 # --- ARCHIVOS FUENTE ---
 
@@ -32,8 +33,8 @@ CORE_SRCS = Particle.cpp \
 
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
 
-CUDA_APP_SRC = kernels/accelerations.cu
-CUDA_APP_OBJ = kernels/accelerations.o
+CUDA_APP_SRC = kernels/accelerations.cu kernels/metrics.cu
+CUDA_APP_OBJ = kernels/accelerations.o kernels/metrics.o
 
 APP_OBJS = main.o $(CORE_OBJS) $(CUDA_APP_OBJ)
 
@@ -53,6 +54,7 @@ CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
 
 CUDA_BUFFER_TEST_SRCS = tests/cuda_buffer_roundtrip_test.cu
 CUDA_INTEGRATION_TEST_SRCS = tests/test_gpu_integration.cu
+CUDA_ENERGY_TEST_SRCS = tests/test_gpu_energy.cu
 
 .PHONY: all clean run test cuda-test test-all benchmark analysis
 
@@ -126,10 +128,14 @@ $(CUDA_BUFFER_TEST_TARGET): $(CUDA_BUFFER_TEST_SRCS) \
 $(CUDA_INTEGRATION_TEST_TARGET): $(CUDA_INTEGRATION_TEST_SRCS) $(CORE_OBJS) $(CUDA_APP_OBJ)
 	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
-cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET)
+$(CUDA_ENERGY_TEST_TARGET): $(CUDA_ENERGY_TEST_SRCS) $(CORE_OBJS) $(CUDA_APP_OBJ)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@
+
+cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET) $(CUDA_ENERGY_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
 	./$(CUDA_BUFFER_TEST_TARGET)
 	./$(CUDA_INTEGRATION_TEST_TARGET)
+	./$(CUDA_ENERGY_TEST_TARGET)
 
 # Ejecuta primero los tests CPU y luego los tests CUDA.
 test-all: test cuda-test
@@ -144,4 +150,5 @@ clean:
 	      $(CUDA_TEST_TARGET) \
 	      $(CUDA_BUFFER_TEST_TARGET) \
 	      $(CUDA_INTEGRATION_TEST_TARGET) \
+	      $(CUDA_ENERGY_TEST_TARGET) \
 	      kernels/*.o

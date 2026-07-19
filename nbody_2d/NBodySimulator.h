@@ -6,8 +6,10 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <utility>
 #include <omp.h>
 #include "CudaBuffer.h"
+#include "kernels/metrics.cuh"
 
 class NBodySimulator {
 private:
@@ -39,6 +41,9 @@ public:
     // Métodos de sobrecarga para la integración en GPU
     void stepEulerGpu();
     void stepEulerGpu(int variant, int block_size);
+
+    std::pair<double, double> calculateEnergyGpu();
+    std::pair<double, double> calculateEnergyGpu(int method);
 };
 
 #endif
