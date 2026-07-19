@@ -7,6 +7,7 @@
 #include <cmath>
 #include <vector>
 #include <omp.h>
+#include "CudaBuffer.h"
 
 class NBodySimulator {
 private:
@@ -34,6 +35,10 @@ public:
     void parallelInitializationSingle();
 
     double getCurrentTime();
+
+    // Métodos de sobrecarga para la integración en GPU
+    void stepEulerGpu();
+    void stepEulerGpu(int variant, int block_size);
 };
 
 #endif

@@ -179,6 +179,45 @@ void NBodySimulator::parallelInitializationSingle() {
     }
 }
 
+void NBodySimulator::stepEulerGpu() {
+    // Implementación de la integración de Euler en GPU
+    system_.computeAccelerationsGpu();
+    
+    // Sincronizar device
+    cudaDeviceSynchronize();
+
+    // D2H transfer
+    system_.downloadStateFromDevice();
+
+    // Recorrer partículas en host para actualizar posiciones y velocidades
+    Integrator::eulerStep(system_, time_step_);
+
+    // H2D transfer
+    system_.uploadStateToDevice();
+
+    // Actualizar tiempo
+    current_time_ += time_step_;
+}
+
+void NBodySimulator::stepEulerGpu(int variant, int block_size) {
+    // Implementación de la integración de Euler en GPU con variantes y tamaño de bloque
+    system_.computeAccelerationsGpu(variant, block_size);
+    
+    // Sincronizar device
+    cudaDeviceSynchronize();
+
+    // D2H transfer
+    system_.downloadStateFromDevice();
+
+    // Recorrer partículas en host para actualizar posiciones y velocidades
+    Integrator::eulerStep(system_, time_step_);
+
+    // H2D transfer
+    system_.uploadStateToDevice();
+
+    // Actualizar tiempo
+    current_time_ += time_step_;
+}
 
 // Getters
 double NBodySimulator::getCurrentTime() {
