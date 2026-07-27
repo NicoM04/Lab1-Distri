@@ -1,11 +1,12 @@
-FROM ubuntu:24.04
+# Imagen base sugerida por el enunciado del Laboratorio 2[cite: 1].
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 # No prompts interactivos.
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Dependencias.
+# Dependencias (C++, CMake, Python y Matplotlib original).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     cmake \
