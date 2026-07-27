@@ -44,9 +44,7 @@ TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
                  kernels/accelerations.cu
 
-cuda-build: $(CUDA_TEST_TARGET)
-
-.PHONY: all clean run test cuda-test test-all benchmark analysis
+.PHONY: all clean run test cuda-build cuda-test test-all benchmark analysis
 
 all: $(TARGET)
 
@@ -106,6 +104,8 @@ $(CUDA_TEST_TARGET): $(CUDA_TEST_SRCS) \
                      CudaCheck.cuh \
                      kernels/accelerations.cuh
 	$(NVCC) $(NVCCFLAGS) $(CUDA_TEST_SRCS) -o $@
+
+cuda-build: $(CUDA_TEST_TARGET)
 
 cuda-test: $(CUDA_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
