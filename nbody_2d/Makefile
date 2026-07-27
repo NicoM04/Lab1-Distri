@@ -44,6 +44,8 @@ TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
                  kernels/accelerations.cu
 
+cuda-build: $(CUDA_TEST_TARGET)
+
 .PHONY: all clean run test cuda-test test-all benchmark analysis
 
 all: $(TARGET)
