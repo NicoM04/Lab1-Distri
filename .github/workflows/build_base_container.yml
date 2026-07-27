@@ -7,7 +7,7 @@ name: build-base-container
 
 on:
   push:
-    branches: [main, master]
+    branches: ['*']
     paths:
       - 'nbody_2d/Dockerfile'
   pull_request:
