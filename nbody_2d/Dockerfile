@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 # No prompts interactivos.
 ENV DEBIAN_FRONTEND=noninteractive

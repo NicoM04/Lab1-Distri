@@ -48,7 +48,7 @@ CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
 
 CUDA_BUFFER_TEST_SRCS = tests/cuda_buffer_roundtrip_test.cu
 
-.PHONY: all clean run test cuda-test test-all benchmark analysis
+.PHONY: all clean run test cuda-build cuda-test test-all benchmark analysis
 
 all: $(TARGET)
 
@@ -114,6 +114,8 @@ $(CUDA_BUFFER_TEST_TARGET): $(CUDA_BUFFER_TEST_SRCS) \
                             CudaCheck.cuh
 	$(NVCC) $(NVCCFLAGS) $(CUDA_BUFFER_TEST_SRCS) -o $@
 
+cuda-build: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET)
+
 cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
 	./$(CUDA_BUFFER_TEST_TARGET)
@@ -129,4 +131,5 @@ clean:
 	      $(TARGET) \
 	      $(TEST_TARGET) \
 	      $(CUDA_TEST_TARGET) \
+	      $(CUDA_BUFFER_TEST_TARGET) \
 	      kernels/*.o

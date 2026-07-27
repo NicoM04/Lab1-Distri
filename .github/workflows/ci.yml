@@ -70,7 +70,7 @@ jobs:
 
       - name: Build project (Make)
         working-directory: ./nbody_2d
-        run: make clean && make all
+        run: make clean && make all && make cuda-build
 
       - name: Run Tests (Catch2)
         working-directory: ./nbody_2d
