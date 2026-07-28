@@ -108,7 +108,7 @@ analysis: $(TARGET)
 # --- TESTS CPU CON CATCH2 ---
 
 $(TEST_TARGET): $(TEST_OBJS) $(CORE_OBJS) $(CUDA_APP_OBJ)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(TEST_LIBS) -lcudart
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(TEST_LIBS) -L$(CUDA_HOME)/lib64 -lcudart
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)
