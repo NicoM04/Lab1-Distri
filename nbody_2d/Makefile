@@ -1,6 +1,6 @@
 CXX = g++
 CUDA_HOME ?= /usr/local/cuda
-NVCC = nvcc
+NVCC = $(CUDA_HOME)/bin/nvcc
 
 CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -fopenmp -I. -Itests -I$(CUDA_HOME)/include
 
@@ -56,7 +56,7 @@ CUDA_BUFFER_TEST_SRCS = tests/cuda_buffer_roundtrip_test.cu
 CUDA_INTEGRATION_TEST_SRCS = tests/test_gpu_integration.cu
 CUDA_ENERGY_TEST_SRCS = tests/test_gpu_energy.cu
 
-.PHONY: all clean run test cuda-test test-all benchmark analysis
+.PHONY: all clean run test cuda-build cuda-test test-all benchmark analysis
 
 all: $(TARGET)
 
@@ -130,6 +130,8 @@ $(CUDA_INTEGRATION_TEST_TARGET): $(CUDA_INTEGRATION_TEST_SRCS) $(CORE_OBJS) $(CU
 
 $(CUDA_ENERGY_TEST_TARGET): $(CUDA_ENERGY_TEST_SRCS) $(CORE_OBJS) $(CUDA_APP_OBJ)
 	$(NVCC) $(NVCCFLAGS) $^ -o $@
+
+cuda-build: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET) $(CUDA_ENERGY_TEST_TARGET)
 
 cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET) $(CUDA_ENERGY_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
