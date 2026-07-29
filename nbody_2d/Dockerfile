@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Dependencias.
+# Dependencias (C++, CMake, Python y Matplotlib original).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     cmake \

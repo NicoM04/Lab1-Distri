@@ -12,7 +12,7 @@ inline void cudaCheckImpl(
     int line
 ) {
     if (error != cudaSuccess) {
-        // Bypass para CI: Ignorar si no hay driver o GPU.
+        // Bypass para CI: Ignorar si no hay driver o no hay GPU conectada.
         if (error == cudaErrorInsufficientDriver || error == cudaErrorNoDevice) {
             return;
         }
