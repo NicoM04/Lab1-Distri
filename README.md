@@ -23,6 +23,26 @@ El proyecto está organizado en `nbody_2d/` y contiene:
 | Métricas y Benchmark | Francisco Riquelme |
 | Calidad, CI y visualización | Thomas Gustafsson |
 
+## Aporte CUDA del Rol 2
+
+La memoria device del simulador 2D CUDA se organiza en SoA para favorecer coalescing:
+
+- `d_mass`
+- `d_x`, `d_y`
+- `d_vx`, `d_vy`
+- `d_ax`, `d_ay`
+
+Cada arreglo vive dentro de `CudaBuffer<T>`, una clase RAII que reserva con `cudaMalloc` y libera con `cudaFree` automáticamente. El ciclo de ejecución queda así:
+
+1. Se reserva memoria device al inicializar el sistema.
+2. Se suben a device las masas y el estado de partículas solo cuando el host cambia.
+3. Se ejecuta el kernel de aceleraciones.
+4. Se sincroniza con `cudaDeviceSynchronize()` a través de `NBodySystem::synchronizeDevice()`.
+5. Se bajan `ax/ay` al host para el Euler en CPU.
+6. Se re-suben solo `x/y/vx/vy` cuando el siguiente paso vuelve a necesitar GPU.
+
+Con este diseño, el número de transferencias por paso temporal se reduce al mínimo práctico: dos copias D2H de aceleraciones y, solo si el estado cambió en host, cuatro copias H2D del estado de partículas.
+
 ## Ejecución con Docker
 
 Usando GitHub Container Registry (GHCR) no será necesario que instales dependencias locales (C++, Python, Matplotlib, Catch2) para ejecutar. Todo está empaquetado en una imagen base.

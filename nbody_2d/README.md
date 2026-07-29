@@ -20,6 +20,40 @@ Estado actual:
 - Dockerfile
 - Makefile
 
+## Memoria CUDA y layout SoA
+
+La capa CUDA del laboratorio usa un layout SoA (Structure of Arrays) para mantener cada atributo físico en un buffer device separado administrado por `CudaBuffer<T>`:
+
+
+Esto favorece coalescing porque hilos consecutivos leen elementos consecutivos del mismo arreglo, por ejemplo `d_x[i]`, `d_x[i+1]`, `d_x[i+2]`, en vez de saltar entre campos mezclados de un AoS.
+
+La memoria device se administra con `CudaBuffer<T>`, una clase RAII que reserva con `cudaMalloc` y libera con `cudaFree` automáticamente. La copia de estado sigue este ciclo:
+
+1. Al construir o reacomodar el sistema, se reserva memoria device para todos los buffers SoA.
+2. Antes del kernel de aceleraciones, se suben a device `mass`, `x`, `y`, `vx` y `vy` solo si el estado host cambió.
+3. Tras el kernel, se llama a `cudaDeviceSynchronize()` mediante `NBodySystem::synchronizeDevice()`.
+4. Luego se bajan `ax` y `ay` al host para que Euler actualice las partículas.
+5. Después de Euler, si el siguiente paso vuelve a usar GPU, se re-sube solo el estado host actualizado necesario para el siguiente kernel.
+
+La clase `NBodySystem` expone dos rutas claras para la parte CUDA:
+
+- `computeAccelerationsGpuKernelOnly(...)`, que deja el kernel lanzado pero no fuerza la descarga de resultados.
+- `computeAccelerationsGpu(...)`, que ejecuta la ruta completa kernel + sincronización + descarga de `ax/ay`.
+
+La clase también expone `deviceTransferCount()` para dejar trazable cuántas copias reales hace el pipeline por paso.
+
+Transferencias por paso temporal en la ruta híbrida actual:
+
+- Inicialización: 1 copia H2D de `mass` y 4 copias H2D de estado `x/y/vx/vy`.
+- Cada paso con GPU: 1 sincronización, 2 copias D2H de aceleraciones `ax/ay`.
+- Cada paso con Euler en host y luego otro kernel GPU: 4 copias H2D de estado actualizado `x/y/vx/vy`.
+
+El contador `deviceTransferCount()` permite verificar este número de transferencias en pruebas o logs.
+
+## Tolerancia numérica
+
+Las transferencias de memoria no cambian la tolerancia física del modelo. Las comparaciones numéricas siguen usando las tolerancias ya definidas en los tests de aceleración e integración; la única precaución es mantener la misma precisión de tipo entre host y device para no introducir diferencias adicionales.
+
 ## Requisitos
 
 - WSL Ubuntu con g++ (>= 11) y make instalados
