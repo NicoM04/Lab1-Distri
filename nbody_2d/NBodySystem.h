@@ -24,6 +24,17 @@ public:
     void computeAccelerations(int schedule_type);
     void computeAccelerations(int schedule_type, int chunk_size);
 
+
+    /*
+    * Sobrecargas CUDA requeridas por el Laboratorio 2.
+    *
+    * Su implementacion definitiva se conectara a la capa de
+    * buffers host/device desarrollada por el Rol 2.
+    */
+    void computeAccelerationsGpu();
+    void computeAccelerationsGpu(int variant);
+    void computeAccelerationsGpu(int variant, int block_size);
+
     std::vector<Particle>& bodies();
     const std::vector<Particle>& bodies() const;
 

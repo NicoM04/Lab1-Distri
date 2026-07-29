@@ -280,3 +280,421 @@ El benchmark estima la fracción serial $f$ a partir de resultados medidos y cal
 $$S_p = \frac{1}{f + \frac{1-f}{p}}$$
 
 Ese valor teórico se exporta junto a los datos medidos para comparar escalabilidad real vs esperada.
+
+
+
+## Implementación CUDA — Laboratorio 2
+
+### Kernels de aceleraciones
+
+Se implementaron dos variantes CUDA para calcular las aceleraciones gravitatorias del sistema de N cuerpos:
+
+- `variant = 0`: kernel básico.
+- `variant = 1`: kernel con memoria compartida.
+
+En ambas variantes se asigna un hilo CUDA a cada cuerpo `i`. El índice global del cuerpo se calcula mediante:
+
+```cpp
+i = blockIdx.x * blockDim.x + threadIdx.x;
+```
+
+La cantidad de bloques de la grilla se obtiene utilizando división a techo:
+
+```cpp
+gridSize = (N + blockSize - 1) / blockSize;
+```
+
+Esto permite procesar correctamente cantidades de cuerpos que no sean múltiplos del tamaño del bloque.
+
+---
+
+### Kernel básico
+
+El kernel `computeAccelerationsKernel` asigna un cuerpo `i` a cada hilo CUDA.
+
+Cada hilo:
+
+1. Calcula su índice global.
+2. Verifica que `i < N`.
+3. Lee la posición del cuerpo `i`.
+4. Recorre secuencialmente todos los cuerpos `j`.
+5. Omite la interacción cuando `j == i`.
+6. Acumula las componentes de aceleración `ax` y `ay`.
+7. Escribe el resultado en:
+
+```text
+d_ax[i]
+d_ay[i]
+```
+
+Cada hilo escribe únicamente la aceleración correspondiente a su propio cuerpo. Por esta razón, no se requieren operaciones atómicas en los kernels de aceleraciones.
+
+La protección de bordes se realiza mediante:
+
+```cpp
+if (i >= n) {
+    return;
+}
+```
+
+---
+
+### Kernel con memoria compartida
+
+El kernel `computeAccelerationsKernelShared` utiliza memoria compartida para reducir accesos repetidos a la memoria global.
+
+Los cuerpos se procesan en grupos o *tiles*. Para cada tile, los hilos del bloque cargan temporalmente:
+
+```text
+sharedMass
+sharedX
+sharedY
+```
+
+La memoria compartida dinámica se distribuye de la siguiente forma:
+
+```text
+sharedMass[blockDim.x]
+sharedX[blockDim.x]
+sharedY[blockDim.x]
+```
+
+Cada hilo carga como máximo un cuerpo del tile. Cuando el último tile contiene menos cuerpos que `blockDim.x`, los elementos restantes se inicializan en cero para evitar accesos fuera de rango.
+
+Se utiliza `__syncthreads()` en dos momentos:
+
+1. Después de cargar los datos del tile.
+2. Después de utilizar el tile y antes de reemplazarlo por el siguiente.
+
+Los hilos cuyo índice cumple `i >= N` no calculan ni escriben aceleraciones, pero deben participar en las llamadas a `__syncthreads()`.
+
+Por esta razón, la variante shared utiliza una variable lógica:
+
+```cpp
+const bool active = i < n;
+```
+
+en lugar de retornar inmediatamente cuando `i >= N`.
+
+Esto evita que algunos hilos abandonen el kernel antes de una barrera de sincronización.
+
+---
+
+### Layout de memoria
+
+Los kernels utilizan un layout `Structure of Arrays` o SoA en memoria device:
+
+```text
+d_mass
+d_x
+d_y
+d_ax
+d_ay
+```
+
+Cada arreglo almacena una sola propiedad para todos los cuerpos:
+
+```text
+d_mass = [mass0, mass1, mass2, ...]
+d_x    = [x0, x1, x2, ...]
+d_y    = [y0, y1, y2, ...]
+d_ax   = [ax0, ax1, ax2, ...]
+d_ay   = [ay0, ay1, ay2, ...]
+```
+
+Este diseño permite que los hilos consecutivos accedan a posiciones consecutivas de memoria, favoreciendo accesos coalescentes en memoria global.
+
+El almacenamiento CPU original mediante `std::vector<Particle>` se conserva como referencia de corrección.
+
+---
+
+### Interfaz de lanzamiento
+
+El lanzador general de los kernels utiliza la siguiente interfaz:
+
+```cpp
+launchComputeAccelerations(
+    d_mass,
+    d_x,
+    d_y,
+    d_ax,
+    d_ay,
+    n,
+    gravitationalConstant,
+    epsilon,
+    variant,
+    blockSize
+);
+```
+
+Las variantes disponibles son:
+
+```text
+0: kernel básico
+1: kernel con memoria compartida
+```
+
+También existen lanzadores específicos:
+
+```cpp
+launchComputeAccelerationsBasic(...);
+launchComputeAccelerationsShared(...);
+```
+
+El tamaño del bloque se recibe como parámetro, lo que permite probar diferentes valores de `blockDim.x`.
+
+---
+
+### Contrato con la capa host/device
+
+Los lanzadores CUDA implementados por el Rol 1 cumplen el siguiente contrato:
+
+- No reservan memoria mediante `cudaMalloc`.
+- No liberan memoria mediante `cudaFree`.
+- No realizan transferencias H2D.
+- No realizan transferencias D2H.
+- No llaman internamente a `cudaDeviceSynchronize()`.
+- Reciben punteros previamente asignados en memoria device.
+- Calculan automáticamente la cantidad de bloques mediante división a techo.
+- Comprueban errores inmediatos de lanzamiento con `cudaGetLastError()`.
+- Permiten seleccionar la variante y el tamaño del bloque.
+
+La capa host/device desarrollada por el Rol 2 será responsable de:
+
+1. Crear los buffers device.
+2. Transformar los datos CPU desde AoS hacia SoA.
+3. Realizar las transferencias H2D.
+4. Invocar el kernel correspondiente.
+5. Sincronizar el device.
+6. Realizar las transferencias D2H.
+7. Actualizar las aceleraciones almacenadas en los objetos `Particle`.
+8. Liberar los buffers mediante una solución RAII.
+
+---
+
+### Manejo de errores CUDA
+
+Se implementó la macro:
+
+```cpp
+CUDA_CHECK(call)
+```
+
+Esta macro comprueba el valor retornado por las funciones de la API CUDA y muestra:
+
+- Descripción del error.
+- Expresión ejecutada.
+- Archivo donde ocurrió.
+- Número de línea.
+
+Ejemplos de uso:
+
+```cpp
+CUDA_CHECK(cudaMalloc(&devicePointer, bytes));
+CUDA_CHECK(cudaMemcpy(destination, source, bytes, cudaMemcpyHostToDevice));
+CUDA_CHECK(cudaDeviceSynchronize());
+CUDA_CHECK(cudaFree(devicePointer));
+```
+
+Después de lanzar cada kernel se ejecuta:
+
+```cpp
+CUDA_CHECK(cudaGetLastError());
+```
+
+Esto permite detectar errores inmediatos en la configuración o lanzamiento del kernel.
+
+La sincronización se realiza desde el test, simulador o benchmark, y no desde el lanzador.
+
+---
+
+### Validación CPU vs. GPU
+
+La versión CPU serial del Laboratorio 1 se conserva como referencia de corrección.
+
+Las comparaciones de aceleraciones utilizan las siguientes tolerancias:
+
+```text
+rtol = 1e-4
+atol = 1e-8
+```
+
+El criterio de comparación utilizado es:
+
+```text
+|resultado_gpu - resultado_cpu|
+<= atol + rtol × |resultado_cpu|
+```
+
+Se realizan las siguientes comparaciones:
+
+- CPU serial vs. kernel básico.
+- CPU serial vs. kernel shared.
+- Kernel básico vs. kernel shared.
+
+Las dos variantes CUDA producen el mismo resultado físico dentro de la tolerancia establecida.
+
+---
+
+### Casos de prueba CUDA
+
+Las pruebas implementadas cubren:
+
+- `N = 2`.
+- `N = 3`.
+- `N = 31`.
+- `N = 32`.
+- `N = 33`.
+- `N < blockDim.x`.
+- `N` múltiplo de `blockDim.x`.
+- `N` no múltiplo de `blockDim.x`.
+- Último tile incompleto.
+- Comparación CPU vs. kernel básico.
+- Comparación CPU vs. kernel shared.
+- Comparación kernel básico vs. kernel shared.
+- Variante CUDA inválida.
+- Tamaño de bloque inválido.
+- Punteros device nulos.
+- Ejecución con `N = 0`.
+
+También se comprobaron los tamaños de bloque requeridos para los benchmarks:
+
+```text
+64
+128
+256
+512
+1024
+```
+
+Todos estos tamaños fueron válidos en la GPU utilizada durante el desarrollo local.
+
+---
+
+### GPU utilizada en desarrollo local
+
+Las pruebas locales fueron ejecutadas mediante WSL2 sobre la siguiente GPU:
+
+```text
+NVIDIA GeForce RTX 3050 6GB Laptop GPU
+Compute Capability: 8.6
+```
+
+El entorno local utilizado fue:
+
+```text
+Ubuntu 24.04 LTS mediante WSL2
+CUDA Toolkit 12.8
+nvcc 12.8
+```
+
+Las mediciones finales de rendimiento deben ejecutarse en el nodo GPU del clúster DIINF.
+
+---
+
+### Compilación
+
+La arquitectura CUDA puede configurarse mediante la variable:
+
+```makefile
+CUDA_ARCH ?= 86
+```
+
+El valor predeterminado `86` corresponde a una GPU con capacidad de cómputo 8.6.
+
+Para compilar utilizando otra arquitectura:
+
+```bash
+make cuda-test CUDA_ARCH=80
+```
+
+El valor debe modificarse de acuerdo con la GPU disponible en el clúster.
+
+---
+
+### Ejecución de tests CUDA
+
+Para compilar y ejecutar solamente las pruebas CUDA:
+
+```bash
+cd nbody_2d
+make cuda-test
+```
+
+Este comando:
+
+1. Compila la prueba CUDA.
+2. Compila los kernels básico y shared.
+3. Ejecuta las comparaciones CPU/GPU.
+4. Comprueba los casos de borde.
+5. Verifica los tamaños de bloque.
+
+---
+
+### Ejecución de todos los tests
+
+Para ejecutar primero los tests CPU y después los tests CUDA:
+
+```bash
+cd nbody_2d
+make test-all
+```
+
+La suite CPU original mantiene:
+
+```text
+208 assertions en 6 casos de prueba
+```
+
+La suite CUDA comprueba ambas variantes y los casos de borde definidos anteriormente.
+
+---
+
+### Limpieza
+
+Para eliminar los objetos y ejecutables generados:
+
+```bash
+make clean
+```
+
+Este objetivo elimina:
+
+```text
+Objetos C++
+Objetos CUDA
+Ejecutable principal
+Ejecutable de tests CPU
+Ejecutable de tests CUDA
+```
+
+---
+
+### Sobrecargas preparadas para integración
+
+En `NBodySystem` se declararon las sobrecargas requeridas por el Laboratorio 2:
+
+```cpp
+void computeAccelerationsGpu();
+void computeAccelerationsGpu(int variant);
+void computeAccelerationsGpu(int variant, int block_size);
+```
+
+La implementación definitiva de estas funciones se realizará al integrar la capa de buffers host/device.
+
+La configuración esperada será:
+
+```text
+computeAccelerationsGpu()
+    → configuración predeterminada
+
+computeAccelerationsGpu(int variant)
+    → selecciona kernel básico o shared
+
+computeAccelerationsGpu(int variant, int block_size)
+    → selecciona variante y tamaño de bloque
+```
+
+Estas funciones reutilizarán los lanzadores existentes, evitando duplicar la lógica física.
+
+
