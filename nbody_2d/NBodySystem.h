@@ -73,6 +73,13 @@ public:
 
     double getGConst() const;
     double getSofteningEps() const;
+
+    // Getters para acceder a los punteros crudos del device
+    const double* getDeviceMass() const { return d_mass_.data(); }
+    const double* getDeviceX() const { return d_x_.data(); }
+    const double* getDeviceY() const { return d_y_.data(); }
+    const double* getDeviceVx() const { return d_vx_.data(); }
+    const double* getDeviceVy() const { return d_vy_.data(); }
 };
 
 #endif

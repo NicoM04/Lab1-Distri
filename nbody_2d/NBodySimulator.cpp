@@ -179,6 +179,94 @@ void NBodySimulator::parallelInitializationSingle() {
     }
 }
 
+void NBodySimulator::stepEulerGpu() {
+    // Implementación de la integración de Euler en GPU
+    system_.computeAccelerationsGpu();
+    
+    // Sincronizar device
+    cudaDeviceSynchronize();
+
+    // D2H transfer
+    system_.downloadStateFromDevice();
+
+    // Recorrer partículas en host para actualizar posiciones y velocidades
+    Integrator::eulerStep(system_, time_step_);
+
+    // H2D transfer
+    system_.uploadStateToDevice();
+
+    // Actualizar tiempo
+    current_time_ += time_step_;
+}
+
+void NBodySimulator::stepEulerGpu(int variant, int block_size) {
+    // Implementación de la integración de Euler en GPU con variantes y tamaño de bloque
+    system_.computeAccelerationsGpu(variant, block_size);
+    
+    // Sincronizar device
+    cudaDeviceSynchronize();
+
+    // D2H transfer
+    system_.downloadStateFromDevice();
+
+    // Recorrer partículas en host para actualizar posiciones y velocidades
+    Integrator::eulerStep(system_, time_step_);
+
+    // H2D transfer
+    system_.uploadStateToDevice();
+
+    // Actualizar tiempo
+    current_time_ += time_step_;
+}
+
+std::pair<double, double> NBodySimulator::calculateEnergyGpu() {
+    // Por defecto se utiliza reducción paralela
+    return calculateEnergyGpu(0);
+}
+
+std::pair<double, double> NBodySimulator::calculateEnergyGpu(int method) {
+    std::size_t n = system_.bodies().size();
+    
+    if (n == 0) return {0.0, 0.0};
+
+    // Tamaño de bloque estándar. Podrías pasarlo por parámetro si quieres experimentar.
+    int block_size = 256; 
+
+    // Extraemos las constantes físicas
+    double G = system_.getGConst();
+    double epsilon = system_.getSofteningEps();
+
+    // 1. Ejecutar Kernel de Energía Cinética
+    double kinetic_energy = launchComputeKineticEnergy(
+        system_.getDeviceMass(),
+        system_.getDeviceVx(),
+        system_.getDeviceVy(),
+        n,
+        method,
+        block_size
+    );
+
+    // 2. Ejecutar Kernel de Energía Potencial
+    double potential_energy = launchComputePotentialEnergy(
+        system_.getDeviceMass(),
+        system_.getDeviceX(),
+        system_.getDeviceY(),
+        n,
+        G,
+        epsilon,
+        method,
+        block_size
+    );
+
+    double total_energy = kinetic_energy + potential_energy;
+
+    // Imprimir o almacenar los resultados
+    std::cout << "[GPU] Energia Cinetica: " << kinetic_energy << "\n"
+              << "[GPU] Energia Potencial: " << potential_energy << "\n"
+              << "[GPU] Energia Total: " << total_energy << "\n";
+
+    return {kinetic_energy, potential_energy};
+}
 
 // Getters
 double NBodySimulator::getCurrentTime() {

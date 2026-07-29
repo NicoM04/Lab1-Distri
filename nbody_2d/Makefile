@@ -9,7 +9,7 @@ LDFLAGS = -L$(CUDA_HOME)/lib64 -lcudart
 # Arquitectura CUDA configurable.
 # GTX 1650: compute capability 7.5.
 CUDA_ARCH ?= 75
-NVCCFLAGS = -O3 -std=c++17 -arch=sm_$(CUDA_ARCH) -Xcompiler=-Wall,-Wextra -I. -Itests -I$(CUDA_HOME)/include
+NVCCFLAGS = -O3 -std=c++17 -arch=sm_$(CUDA_ARCH) -Xcompiler=-Wall,-Wextra,-fopenmp -I. -Itests -I$(CUDA_HOME)/include
 
 # Librerías de Catch2 v3
 TEST_LIBS = -lCatch2Main -lCatch2
@@ -18,6 +18,8 @@ TARGET = nbody_2d
 TEST_TARGET = run_tests
 CUDA_TEST_TARGET = gpu_accelerations_smoke_test
 CUDA_BUFFER_TEST_TARGET = cuda_buffer_roundtrip_test
+CUDA_INTEGRATION_TEST_TARGET = gpu_integration_test
+CUDA_ENERGY_TEST_TARGET = gpu_energy_test
 
 # --- ARCHIVOS FUENTE ---
 
@@ -35,9 +37,11 @@ CORE_SRCS = Particle.cpp \
 CU_CORE_SRCS = kernels/accelerations.cu
 
 CORE_OBJS = $(CORE_SRCS:.cpp=.o)
-CU_CORE_OBJS = $(CU_CORE_SRCS:.cu=.o)
 
-APP_OBJS = main.o $(CORE_OBJS) $(CU_CORE_OBJS)
+CUDA_APP_SRC = kernels/accelerations.cu kernels/metrics.cu
+CUDA_APP_OBJ = kernels/accelerations.o kernels/metrics.o
+
+APP_OBJS = main.o $(CORE_OBJS) $(CUDA_APP_OBJ)
 
 # Tests CPU
 TEST_SRCS = tests/test_acceleration.cpp \
@@ -54,6 +58,8 @@ CUDA_TEST_SRCS = tests/gpu_accelerations_smoke_test.cu \
                  kernels/accelerations.cu
 
 CUDA_BUFFER_TEST_SRCS = tests/cuda_buffer_roundtrip_test.cu
+CUDA_INTEGRATION_TEST_SRCS = tests/test_gpu_integration.cu
+CUDA_ENERGY_TEST_SRCS = tests/test_gpu_energy.cu
 
 .PHONY: all clean run test cuda-build cuda-test test-all benchmark analysis
 
@@ -107,8 +113,8 @@ analysis: $(TARGET)
 
 # --- TESTS CPU CON CATCH2 ---
 
-$(TEST_TARGET): $(TEST_OBJS) $(CORE_OBJS) $(CU_CORE_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(TEST_LIBS) $(LDFLAGS)
+$(TEST_TARGET): $(TEST_OBJS) $(CORE_OBJS) $(CUDA_APP_OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(TEST_LIBS) -L$(CUDA_HOME)/lib64 -lcudart
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)
@@ -125,11 +131,19 @@ $(CUDA_BUFFER_TEST_TARGET): $(CUDA_BUFFER_TEST_SRCS) \
                             CudaCheck.cuh
 	$(NVCC) $(NVCCFLAGS) $(CUDA_BUFFER_TEST_SRCS) -o $@
 
-cuda-build: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET)
+$(CUDA_INTEGRATION_TEST_TARGET): $(CUDA_INTEGRATION_TEST_SRCS) $(CORE_OBJS) $(CUDA_APP_OBJ)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@
 
-cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET)
+$(CUDA_ENERGY_TEST_TARGET): $(CUDA_ENERGY_TEST_SRCS) $(CORE_OBJS) $(CUDA_APP_OBJ)
+	$(NVCC) $(NVCCFLAGS) $^ -o $@
+
+cuda-build: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET) $(CUDA_ENERGY_TEST_TARGET)
+
+cuda-test: $(CUDA_TEST_TARGET) $(CUDA_BUFFER_TEST_TARGET) $(CUDA_INTEGRATION_TEST_TARGET) $(CUDA_ENERGY_TEST_TARGET)
 	./$(CUDA_TEST_TARGET)
 	./$(CUDA_BUFFER_TEST_TARGET)
+	./$(CUDA_INTEGRATION_TEST_TARGET)
+	./$(CUDA_ENERGY_TEST_TARGET)
 
 # Ejecuta primero los tests CPU y luego los tests CUDA.
 test-all: test cuda-test
@@ -143,4 +157,6 @@ clean:
 	      $(TEST_TARGET) \
 	      $(CUDA_TEST_TARGET) \
 	      $(CUDA_BUFFER_TEST_TARGET) \
+	      $(CUDA_INTEGRATION_TEST_TARGET) \
+	      $(CUDA_ENERGY_TEST_TARGET) \
 	      kernels/*.o

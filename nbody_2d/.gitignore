@@ -1,5 +1,6 @@
 nbody_2d/cuda_buffer_roundtrip_test
 nbody_2d/gpu_accelerations_smoke_test
+nbody_2d/gpu_integration_test
 nbody_2d/run_tests
 nbody_2d/nbody_2d
 nbody_2d/*.o

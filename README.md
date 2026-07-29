@@ -554,6 +554,21 @@ Se realizan las siguientes comparaciones:
 
 Las dos variantes CUDA producen el mismo resultado físico dentro de la tolerancia establecida.
 
+Para las validaciones de integración temporal y métricas de energía se establecieron los siguientes criterios:
+- **Tolerancias:** Se utilizó `rtol = 1e-4` y `atol = 1e-8` para todas las comparaciones (Euler y Energías).
+- **Justificación:** Al reutilizar la secuencia exacta de operaciones de `Integrator::eulerStep` en el host, la propagación del error de coma flotante se mantuvo idéntica entre la CPU y la GPU. Esto permitió mantener una tolerancia estricta del 0.01% incluso tras múltiples pasos iterativos, demostrando que ambas arquitecturas calculan el modelo físico con alta fidelidad y sin divergencia prematura.
+
+---
+
+### Cálculo de Energías en GPU
+
+Se implementaron dos variantes CUDA para calcular la Energía Cinética ($K$) y la Energía Potencial ($U$) del sistema, llamadas a través de `NBodySimulator::calculateEnergyGpu(int method)`:
+
+- `method = 0` (Reducción en memoria compartida): Cada hilo calcula su valor local y lo carga en `extern __shared__ double`. Luego, el bloque realiza una reducción paralela en forma de árbol binario. Finalmente, solo el hilo `0` de cada bloque utiliza `atomicAdd` para sumar el resultado parcial a la variable global.
+- `method = 1` (Operaciones Atómicas): Cada hilo calcula su contribución individual (ya sea de $K$ o de $U$) y la suma directamente a una variable global en el device utilizando `atomicAdd`.
+
+Ambas variantes fueron validadas contra la implementación serial de la CPU, demostrando generar resultados equivalentes dentro de la tolerancia permitida.
+
 ---
 
 ### Casos de prueba CUDA
