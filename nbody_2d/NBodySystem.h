@@ -1,3 +1,10 @@
+/**
+ * @file NBodySystem.h
+ * @brief Define la clase NBodySystem encargada de almacenar y gestionar el estado de las partículas.
+ *
+ * Administra la representación de las partículas en memoria (host y device),
+ * facilitando las transferencias y el cálculo de interacciones gravitacionales.
+ */
 #ifndef NBODYSYSTEM_H
 #define NBODYSYSTEM_H
 

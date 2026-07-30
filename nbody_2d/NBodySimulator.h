@@ -1,3 +1,10 @@
+/**
+ * @file NBodySimulator.h
+ * @brief Define la clase NBodySimulator encargada de gestionar y ejecutar la simulación de N-cuerpos.
+ * 
+ * Contiene la lógica del bucle principal, actualización del tiempo,
+ * y coordinación entre el sistema de partículas y el integrador.
+ */
 #ifndef NBODYSIMULATOR_H
 #define NBODYSIMULATOR_H
 

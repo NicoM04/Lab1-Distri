@@ -1,3 +1,10 @@
+/**
+ * @file CudaCheck.cuh
+ * @brief Define macros y funciones utilitarias para la comprobación de errores de CUDA.
+ *
+ * Proporciona el mecanismo CUDA_CHECK para envolver llamadas a la API de CUDA
+ * y capturar errores de forma robusta.
+ */
 #pragma once
 
 #include <cuda_runtime.h>
