@@ -1,0 +1,59 @@
+# Agente revisor de bugs (Rol 4). Independiente del CI principal (ci.yml).
+# Analiza main en busca de senales mecanicas de riesgo (incluyendo si la
+# ultima ejecucion de ci.yml fallo, consultada via la API de Actions, sin
+# re-ejecutar la suite de tests) y abre issues cuando corresponde. Nunca
+# modifica main ni fusiona nada.
+name: agent-bug-reviewer
+
+on:
+  schedule:
+    # Todos los dias a las 07:00 UTC.
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Ejecutar en modo dry-run (no escribe en GitHub)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+  models: read
+  # Necesario para consultar (sin re-ejecutar) la última conclusión de ci.yml en main.
+  actions: read
+
+concurrency:
+  group: agent-bug-reviewer
+  cancel-in-progress: true
+
+jobs:
+  run-bug-reviewer:
+    name: Ejecutar agente revisor de bugs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AGENT_API_URL: ${{ secrets.AGENT_API_URL }}
+      AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+      AGENT_MODEL: ${{ secrets.AGENT_MODEL }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run bug reviewer agent
+        env:
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${DRY_RUN_INPUT}" = "true" ]; then
+            python scripts/agents/bug_reviewer.py --dry-run
+          else
+            python scripts/agents/bug_reviewer.py
+          fi

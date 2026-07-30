@@ -732,4 +732,136 @@ computeAccelerationsGpu(int variant, int block_size)
 
 Estas funciones reutilizarán los lanzadores existentes, evitando duplicar la lógica física.
 
+## Roles del equipo — Laboratorio 2
+
+Roles inferidos a partir de las ramas y commits fusionados en `main`
+(`feature/cuda-acceleration-kernels`, `feature/cuda-buffer`,
+`feature/integration-gpu`, `feature/ci-cuda-env`). Confirmar/corregir con el
+equipo si algún dato no coincide.
+
+| Rol | Encargado | Área |
+|---|---|---|
+| Rol 1 | Francisco Riquelme | Kernels CUDA de aceleraciones (básico y shared) |
+| Rol 2 | Gabriel Cabrera | `CudaBuffer` RAII y gestión de memoria host/device |
+| Rol 3 | Amaru Monje | Integración Euler GPU y cálculo de energía |
+| Rol 4 | Nicolás Morales | Git, releases y agentes de IA (este documento) |
+| Rol 5 | Thomas Gustafsson *(inferido, confirmar)* | CI, Docker y calidad |
+
+## Flujo Git (Laboratorio 2)
+
+Resumen — ver `docs/git-and-releases.md` para el detalle completo:
+
+- `main` está **protegida**: no se permite push ni commits directos.
+- Todo cambio se hace en una rama `feature/*` o `fix/*`.
+- La PR hacia `main` debe vincular un issue (`Closes #<numero>`).
+- La PR debe tener el CI (`ci.yml`) en verde y pasar revisión humana antes
+  de fusionarse.
+- Tras fusionar, la rama se elimina.
+- Ningún agente de IA aprueba ni fusiona PRs; el merge siempre lo hace una
+  persona.
+
+## Agentes de IA (Rol 4)
+
+Tres agentes de solo lectura sobre el código (con permiso de escritura
+limitado a issues/comentarios), implementados en `scripts/agents/` y
+disparados por los workflows en `.github/workflows/agent-*.yml`. Ninguno
+hace merge ni escribe en `main`. Detalle de diseño en
+`scripts/agents/README.md`.
+
+| Agente | Herramienta | Disparador / frecuencia | Entradas | Salida | Criterio mecánico | Criterio humano | Permisos |
+|---|---|---|---|---|---|---|---|
+| Documentador | `scripts/agents/documenter.py` | `schedule` semanal (lunes), `workflow_dispatch`, push a `main` que toque README/CHANGELOG | README.md, nbody_2d/README.md, nbody_2d/tests/README.md, CHANGELOG.md | Issue etiquetado `documentation` + `agent-documenter` | Typo, enlace roto, encabezado faltante, plantilla evidente | Explicar kernels, memoria, física, sincronización o tolerancias → `Requiere intervención humana: <motivo>` (garantizado por código, no solo por prompt) | `contents: read`, `issues: write`, `models: read` |
+| Revisor de bugs | `scripts/agents/bug_reviewer.py` | `schedule` diario, `workflow_dispatch` | Código fuente de `nbody_2d/`, `git ls-files`, última conclusión de `ci.yml` en `main` (vía API, sin re-ejecutar tests) | Issue etiquetado `bug` + `agent-bug-reviewer` (con parche sugerido si es mecánico) | CUDA sin `CUDA_CHECK`, archivo generado versionado | Física, API pública, orden del integrador, lógica de kernels, reducción/sincronización no trivial, o CI en fallo → `Requiere intervención humana: <motivo>` (garantizado por código) | `contents: read`, `issues: write`, `models: read`, `actions: read` |
+| Revisor de PR | `scripts/agents/pr_reviewer.py` | `workflow_run` al terminar `CI` (`ci.yml`), `workflow_dispatch` manual | Resultado de CI, diff de la PR, descripción de la PR | Comentario en la PR (uno por commit) | CI verde, solo doc/formato/config evidente, sin tocar física/kernels/API pública, con issue vinculado (`Closes #N`/`Fixes #N`/`Resolves #N`/`Refs #N`, etc.) | Cualquier otro caso, o CI en fallo → revisión humana (garantizado por código: nunca se omite el recordatorio de que el merge es humano) | `contents: read`, `issues: write`, `pull-requests: write`, `models: read` |
+
+### Etiquetas requeridas antes de la primera ejecución real
+
+GitHub rechaza la creación de un issue si alguna etiqueta indicada no existe
+en el repositorio. Antes de la primera ejecución real (no `--dry-run`) del
+documentador o del revisor de bugs, una persona debe verificar/crear en
+GitHub:
+
+- `documentation` (label por defecto de GitHub; **confirmar que exista**)
+- `agent-documenter` (custom; casi seguro **no existe todavía**)
+- `bug` (label por defecto de GitHub; **confirmar que exista**)
+- `agent-bug-reviewer` (custom; casi seguro **no existe todavía**)
+
+El conteo del límite semanal (máximo 5 issues automáticos por agente cada 7
+días, ver más abajo) usa la etiqueta específica de cada agente
+(`agent-documenter`/`agent-bug-reviewer`), no la etiqueta genérica
+compartida, para no contar issues creados manualmente por personas.
+
+Si falta una etiqueta (o cualquier otro error de la API ocurre al crear un
+issue), el agente registra un mensaje claro en el log y **continúa
+procesando los hallazgos restantes** en la misma ejecución; no se detiene
+con un error sin manejar.
+
+### Proveedor de IA y secretos
+
+No hay ningún proveedor de IA ya configurado en este repositorio. La capa
+`scripts/agents/common.py` es agnóstica de proveedor:
+
+1. Si existen los secrets `AGENT_API_URL` y `AGENT_API_KEY` (y opcionalmente
+   `AGENT_MODEL`), se usa ese endpoint compatible con OpenAI.
+2. Si no, se intenta GitHub Models usando el `GITHUB_TOKEN` automático de
+   Actions (requiere que GitHub Models esté habilitado para el repositorio
+   y el permiso `models: read`; **esto debe confirmarlo una persona con
+   acceso a la organización/repositorio**, no fue verificado como parte de
+   este trabajo).
+3. Si ninguno está disponible, el agente falla con un mensaje claro (o solo
+   corre en `--dry-run` con un análisis estático sin IA) — nunca simula una
+   respuesta.
+
+No se requiere ningún secreto nuevo para que los workflows *existan y hagan
+`--dry-run`*; si se quiere un proveedor externo, agregar `AGENT_API_URL` y
+`AGENT_API_KEY` como *secrets* del repositorio (Settings → Secrets and
+variables → Actions).
+
+### Ejecutar los agentes manualmente
+
+Desde la pestaña **Actions** de GitHub, cada workflow `agent-*` tiene
+`workflow_dispatch` con un input `dry_run`. También se pueden correr en
+local (ver `scripts/agents/README.md`):
+
+```bash
+export GITHUB_TOKEN=...   # o usar --dry-run
+export GITHUB_REPOSITORY=NicoM04/Lab1-Distri
+python scripts/agents/documenter.py --dry-run
+python scripts/agents/bug_reviewer.py --dry-run
+python scripts/agents/pr_reviewer.py --pr-number <n> --sha <sha> --conclusion success --dry-run
+```
+
+`--dry-run` (o `AGENT_DRY_RUN=1`) evita cualquier escritura en GitHub
+(issues o comentarios); solo imprime lo que habría hecho.
+
+### Límites y garantías
+
+- Máximo **5 issues automáticos por agente (etiqueta `agent-documenter`/
+  `agent-bug-reviewer`) cada 7 días** sin revisión humana; superado el
+  límite, el agente lo indica en el log y no crea más.
+- El límite es **fail-closed**: si no se puede verificar el conteo semanal
+  (p. ej. error de red o de la API de GitHub), el agente **no crea el
+  issue** y registra "Requiere intervención humana: revisar la API de
+  GitHub" — nunca asume que el conteo es cero.
+- **Ningún agente fusiona ni aprueba PRs.** El merge es siempre una acción
+  humana; el revisor de PR fuerza este recordatorio por código en cada
+  comentario, sin depender de que el modelo de IA lo incluya.
+- Los issues y comentarios usan marcadores HTML identificables para no
+  duplicar el mismo hallazgo/commit.
+
+### Procedimiento de release
+
+Ver `docs/git-and-releases.md` (sección 5) para el detalle. Resumen:
+
+1. Mover las entradas de `CHANGELOG.md` de `[Unreleased]` a `[2.0.0] -
+   YYYY-MM-DD`.
+2. Confirmar que `ci.yml` está en verde sobre `main`.
+3. Fusionar las PR pendientes que deban incluirse.
+4. Crear el tag `v2.0.0-lab2` desde `main`.
+5. Publicar las notas de release usando `docs/release-notes-v2.0.0-lab2.md`
+   como base.
+
+**Esto todavía no se ha hecho.** No existe el tag `v2.0.0-lab2` ni la
+release; `docs/release-notes-v2.0.0-lab2.md` es un borrador.
+
 
