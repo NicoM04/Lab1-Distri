@@ -1,0 +1,96 @@
+# Agente revisor de pull requests (Rol 4). Se dispara con workflow_run al
+# terminar el workflow de CI existente ("CI", definido en ci.yml). No
+# modifica ci.yml ni depende de sus permisos; solo observa su conclusion.
+# Nunca aprueba ni fusiona la PR.
+name: agent-pr-reviewer
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Numero de PR (modo manual)'
+        required: true
+        type: string
+      sha:
+        description: 'SHA del commit evaluado por CI (modo manual)'
+        required: true
+        type: string
+      conclusion:
+        description: 'Conclusion del CI a simular'
+        required: true
+        type: choice
+        options:
+          - success
+          - failure
+          - cancelled
+          - skipped
+        default: 'success'
+      run_url:
+        description: 'URL de la ejecucion de CI a mostrar en el comentario (opcional)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Ejecutar en modo dry-run (no escribe en GitHub)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  models: read
+
+concurrency:
+  group: agent-pr-reviewer-${{ github.event.workflow_run.head_sha || github.event.inputs.sha || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  run-pr-reviewer:
+    name: Ejecutar agente revisor de PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Solo nos interesan las ejecuciones de CI disparadas por una PR; una
+    # ejecucion de CI por push directo (p. ej. a main) no tiene PR asociada.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.event == 'pull_request'
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AGENT_API_URL: ${{ secrets.AGENT_API_URL }}
+      AGENT_API_KEY: ${{ secrets.AGENT_API_KEY }}
+      AGENT_MODEL: ${{ secrets.AGENT_MODEL }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run PR reviewer agent (workflow_run)
+        if: github.event_name == 'workflow_run'
+        run: python scripts/agents/pr_reviewer.py
+
+      - name: Run PR reviewer agent (manual)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SHA: ${{ inputs.sha }}
+          CONCLUSION: ${{ inputs.conclusion }}
+          RUN_URL: ${{ inputs.run_url }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          ARGS=(--pr-number "$PR_NUMBER" --sha "$SHA" --conclusion "$CONCLUSION")
+          if [ -n "$RUN_URL" ]; then
+            ARGS+=(--run-url "$RUN_URL")
+          fi
+          if [ "$DRY_RUN_INPUT" = "true" ]; then
+            ARGS+=(--dry-run)
+          fi
+          python scripts/agents/pr_reviewer.py "${ARGS[@]}"
