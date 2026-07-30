@@ -1,3 +1,10 @@
+/**
+ * @file CudaBuffer.h
+ * @brief Define la plantilla de clase CudaBuffer para la gestión de memoria en GPU.
+ *
+ * Encapsula la reserva, liberación y copias de memoria (Host/Device) 
+ * asegurando un manejo seguro basado en RAII.
+ */
 #pragma once
 
 #include "./CudaCheck.cuh"
