@@ -184,7 +184,7 @@ void NBodySimulator::stepEulerGpu() {
     system_.computeAccelerationsGpu();
     
     // Sincronizar device
-    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     // D2H transfer
     system_.downloadStateFromDevice();
@@ -204,7 +204,7 @@ void NBodySimulator::stepEulerGpu(int variant, int block_size) {
     system_.computeAccelerationsGpu(variant, block_size);
     
     // Sincronizar device
-    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     // D2H transfer
     system_.downloadStateFromDevice();

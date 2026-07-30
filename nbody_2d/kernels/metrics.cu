@@ -129,7 +129,7 @@ double launchComputeKineticEnergy(
         std::size_t sharedMemBytes = blockSize * sizeof(double);
         kineticEnergyReductionKernel<<<gridSize, blockSize, sharedMemBytes>>>(dMass, dVx, dVy, n, dTotalK);
     } else {
-        cudaFree(dTotalK);
+        CUDA_CHECK(cudaFree(dTotalK));
         throw std::invalid_argument("Metodo de energia cinetica invalido (debe ser 0 o 1).");
     }
 
@@ -162,7 +162,7 @@ double launchComputePotentialEnergy(
         std::size_t sharedMemBytes = blockSize * sizeof(double);
         potentialEnergyReductionKernel<<<gridSize, blockSize, sharedMemBytes>>>(dMass, dX, dY, n, G, eps2, dTotalU);
     } else {
-        cudaFree(dTotalU);
+        CUDA_CHECK(cudaFree(dTotalU));
         throw std::invalid_argument("Metodo de energia potencial invalido (debe ser 0 o 1).");
     }
 
