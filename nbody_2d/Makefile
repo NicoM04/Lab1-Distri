@@ -31,6 +31,7 @@ CORE_SRCS = Particle.cpp \
             Integrator.cpp \
             MetricsCalculator.cpp \
             Benchmark.cpp \
+            BenchmarkCuda.cpp \
             Visualizer.cpp
 
 # Fuente CUDA que debe incluirse en el ejecutable principal

@@ -5,3 +5,9 @@ nbody_2d/run_tests
 nbody_2d/nbody_2d
 nbody_2d/*.o
 nbody_2d/tests/*.o
+
+# Lab 2 - Archivos generados y temporales
+lab2_plots/venv/
+lab2_plots/*.dat
+lab2_plots/*.log
+lab2_plots/*.png
