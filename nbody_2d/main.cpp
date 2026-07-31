@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "Benchmark.h"
+#include "BenchmarkCuda.h"
 #include "Visualizer.h"
 
 #ifdef _OPENMP
@@ -129,6 +130,7 @@ void printUsage(const char* exe) {
         << "  -energy-output <p>  Global metrics output path (default: energy_timeseries.dat)\n"
         << "  -export-energy      Also export energy/CoM/RMS time series\n"
         << "  -benchmark          Run complete suite (scaling + schedules)\n"
+        << "  -benchmark-cuda     Run CUDA benchmarking suite to generate .dat files\n"
         << "  -scaling            Run scaling analysis\n"
         << "  -schedules          Run schedule/chunk comparison\n"
         << "  -N <int>            Problem size N (default: 1000)\n"
@@ -189,14 +191,15 @@ int main(int argc, char** argv) {
     }
 
     bool run_benchmark = hasFlag(args, "-benchmark");
+    bool run_benchmark_cuda = hasFlag(args, "-benchmark-cuda");
     bool run_scaling = hasFlag(args, "-scaling");
     bool run_schedules = hasFlag(args, "-schedules");
     bool run_plot = hasFlag(args, "-plot");
     bool run_simulation = hasFlag(args, "-simulate");
     bool export_energy = hasFlag(args, "-export-energy");
 
-    if (!run_benchmark && !run_scaling && !run_schedules && !run_simulation) {
-        run_benchmark = true;
+    if (!run_benchmark && !run_scaling && !run_schedules && !run_simulation && !run_benchmark_cuda) {
+        run_benchmark_cuda = true; // Default to CUDA benchmark now for Lab 2
     }
 
     if (run_benchmark) {
@@ -278,7 +281,11 @@ int main(int argc, char** argv) {
         schedule_chunks = {1, 4, 16, 64};
     }
 
-    const std::filesystem::path results_dir = std::filesystem::current_path() / "Resultados_Benchmark";
+    std::filesystem::path results_dir = std::filesystem::current_path() / "Resultados_Benchmark";
+    if (run_benchmark_cuda) {
+        results_dir = std::filesystem::current_path() / "lab2_plots";
+    }
+    
     std::error_code fs_error;
     std::filesystem::create_directories(results_dir, fs_error);
     if (fs_error) {
@@ -327,6 +334,11 @@ int main(int argc, char** argv) {
               << "  schedule    = " << Benchmark::scheduleName(scaling_schedule) << "\n"
               << "  chunk       = " << scaling_chunk << "\n"
               << "  output      = " << output_base << "\n";
+
+    if (run_benchmark_cuda) {
+        BenchmarkCuda::runCudaBenchmarks(repetitions, dt, seed, results_dir.string());
+        return EXIT_SUCCESS;
+    }
 
     if (run_scaling) {
         const std::vector<BenchmarkRunResult> scaling_results = Benchmark::runScalingAnalysis(

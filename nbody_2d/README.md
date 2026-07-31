@@ -1,133 +1,108 @@
-# nbody_2d
+# Laboratorio 2: Programación GPGPU con CUDA
+## Simulador gravitatorio N-cuerpos en 2D (C++/CUDA)
 
-Implementacion inicial serial para el Laboratorio 1 de N-Cuerpos.
+Este proyecto extiende el simulador N-cuerpos del Laboratorio 1, migrando el núcleo computacional a la GPU utilizando **CUDA** con un diseño orientado a coalescing (SoA) y memoria compartida. Además, incorpora prácticas rigurosas de Git, Integración Continua (CI) y agentes de Inteligencia Artificial para automatizar tareas.
 
-Estado actual:
-- Semana 1 completa.
-- Semana 2 completa: computeAccelerations en paralelo (OpenMP), comparacion serial vs paralelo para N pequeno y verificacion con tolerancia de coma flotante.
+### Estado Actual:
+- Kernels CUDA (básico y memoria compartida) implementados y validados.
+- Transferencias optimizadas Host/Device mediante la clase RAII `CudaBuffer`.
+- Pruebas unitarias e integración en CPU y GPU operativas con tolerancias definidas.
+- Benchmark integrado (`-benchmark-cuda`) para generar reportes en clúster.
 
-## Estructura
+---
 
-- main.cpp
-- Particle.h / Particle.cpp
-- NBodySystem.h / NBodySystem.cpp
-- NBodySimulator.h / NBodySimulator.cpp
-- Integrator.h / Integrator.cpp
-- MetricsCalculator.h / MetricsCalculator.cpp
-- Benchmark.h / Benchmark.cpp
-- Visualizer.h / Visualizer.cpp
-- tests/
-- Dockerfile
-- Makefile
+## 👥 Equipo y Roles
 
-## Memoria CUDA y layout SoA
+De acuerdo con las especificaciones del Laboratorio 2, el equipo se distribuye en 5 roles principales:
 
-La capa CUDA del laboratorio usa un layout SoA (Structure of Arrays) para mantener cada atributo físico en un buffer device separado administrado por `CudaBuffer<T>`:
+| Rol | Responsable | Tareas Principales |
+| :--- | :--- | :--- |
+| **1. Kernels CUDA** | Francisco Riquelme | Desarrollo de `computeAccelerationsKernel` (básico y shared). Manejo de índices 1D, validación de bordes y macros `CUDA_CHECK`. |
+| **2. Host/Device y memoria** | Gabriel Cabrera | Diseño de `CudaBuffer`. Layout SoA (`d_mass`, `d_x`, etc.). Minimización de transferencias `cudaMemcpy` por paso temporal. |
+| **3. Integración y validación** | Amaru Monje | Integrador de Euler sincronizado con Device. Tests de CPU vs GPU (con tolerancias `rtol=1e-4`, `atol=1e-8`). Kernels de reducción (Energía). |
+| **4. Git, releases y agentes** | Nicolás Morales | Gestión de ramas (`main` protegida, `feature/*`, `fix/*`). Mantenimiento del `CHANGELOG.md`. Configuración de los agentes de IA (Documentador, Bugs, MRs). |
+| **5. Calidad, CI y visualización**| Thomas Gustafsson | Mantenimiento de `Makefile` y Dockerfile. Configuración de CI (`make test` en MRs). Ejecución de benchmarks en clúster y generación de gráficas `.png`. |
 
+*(Reemplazar los nombres entre corchetes antes de la entrega final)*
 
-Esto favorece coalescing porque hilos consecutivos leen elementos consecutivos del mismo arreglo, por ejemplo `d_x[i]`, `d_x[i+1]`, `d_x[i+2]`, en vez de saltar entre campos mezclados de un AoS.
+---
 
-La memoria device se administra con `CudaBuffer<T>`, una clase RAII que reserva con `cudaMalloc` y libera con `cudaFree` automáticamente. La copia de estado sigue este ciclo:
+## 🧠 Estructura CUDA y Layout SoA
 
-1. Al construir o reacomodar el sistema, se reserva memoria device para todos los buffers SoA.
-2. Antes del kernel de aceleraciones, se suben a device `mass`, `x`, `y`, `vx` y `vy` solo si el estado host cambió.
-3. Tras el kernel, se llama a `cudaDeviceSynchronize()` mediante `NBodySystem::synchronizeDevice()`.
-4. Luego se bajan `ax` y `ay` al host para que Euler actualice las partículas.
-5. Después de Euler, si el siguiente paso vuelve a usar GPU, se re-sube solo el estado host actualizado necesario para el siguiente kernel.
+El simulador GPU maneja la memoria a través de **Structure of Arrays (SoA)** para garantizar el *memory coalescing*. 
+La memoria se administra dinámicamente usando la plantilla `CudaBuffer<T>`, la cual abstrae `cudaMalloc` y `cudaFree`.
 
-La clase `NBodySystem` expone dos rutas claras para la parte CUDA:
+### Variantes de Ejecución (Kernels)
+- **Variante 0 (Básica)**: Cada hilo calcula la aceleración de un cuerpo `i` iterando sobre el resto `j`. Usa memoria global directamente.
+- **Variante 1 (Shared Memory)**: Utiliza *tiling* (bloques de memoria compartida) para cargar partes del sistema y reducir las lecturas a la memoria global. Se sincroniza internamente usando `__syncthreads()`.
 
-- `computeAccelerationsGpuKernelOnly(...)`, que deja el kernel lanzado pero no fuerza la descarga de resultados.
-- `computeAccelerationsGpu(...)`, que ejecuta la ruta completa kernel + sincronización + descarga de `ax/ay`.
+---
 
-La clase también expone `deviceTransferCount()` para dejar trazable cuántas copias reales hace el pipeline por paso.
+## 🤖 Agentes de IA en el Repositorio
 
-Transferencias por paso temporal en la ruta híbrida actual:
+El proyecto utiliza scripts/pipelines automatizados configurados para revisar partes clave del ciclo de desarrollo. (Revisar los scripts en `.github/workflows/` o `scripts/agents/`):
+- **Documentador:** Revisa que el README, CHANGELOG y comentarios no estén desactualizados. Crea *issues* o MRs si la reparación es mecánica (`agent:auto-fix`).
+- **Revisor de Bugs:** Análisis diario sobre `main` en busca de regresiones, uso de `CUDA_CHECK` y memory leaks de CUDA.
+- **Revisor de MRs:** Se dispara al abrir/actualizar un Pull/Merge Request. Clasifica el cambio como automático o detiene el merge indicando **"Requiere intervención humana"** si involucra cambios físicos o arquitectónicos complejos.
 
-- Inicialización: 1 copia H2D de `mass` y 4 copias H2D de estado `x/y/vx/vy`.
-- Cada paso con GPU: 1 sincronización, 2 copias D2H de aceleraciones `ax/ay`.
-- Cada paso con Euler en host y luego otro kernel GPU: 4 copias H2D de estado actualizado `x/y/vx/vy`.
+---
 
-El contador `deviceTransferCount()` permite verificar este número de transferencias en pruebas o logs.
+## 🚀 Cómo Compilar y Ejecutar
 
-## Tolerancia numérica
+### Dependencias
+- Driver de NVIDIA y CUDA Toolkit (versión >= 12.x recomendada).
+- Compiladores: `nvcc` y `g++` (soporte para C++17).
+- GNU Make.
+- Python 3 + Matplotlib + Numpy (para visualización).
 
-Las transferencias de memoria no cambian la tolerancia física del modelo. Las comparaciones numéricas siguen usando las tolerancias ya definidas en los tests de aceleración e integración; la única precaución es mantener la misma precisión de tipo entre host y device para no introducir diferencias adicionales.
-
-## Requisitos
-
-- WSL Ubuntu con g++ (>= 11) y make instalados
-- Python 3 con matplotlib para generar PNG (`python3 -m pip install --user matplotlib`)
-
-## Compilar y ejecutar
-
-1. Abrí una terminal WSL Ubuntu en VS Code.
-2. Navegá al directorio del proyecto:
-
-```bash
-cd "/mnt/c/Users/matia/OneDrive/Escritorio/Lab1 Distri/nbody_2d"
-```
-
-3. Limpiar y compilar:
-
+### Compilación Local
 ```bash
 make clean
 make
 ```
+*(Si deseas compilar con Docker: `docker build -t nbody_cuda .`)*
 
-4. Ejecutar simulación base:
-
-```bash
-./nbody_2d
-```
-
-5. Ejecutar benchmark de rendimiento:
-
-```bash
-make benchmark
-```
-
-Este comando genera:
-- `Resultados_Benchmark/benchmark_scaling.dat` y `Resultados_Benchmark/benchmark_schedules.dat`.
-- `performance_plots.png` con speedup, eficiencia, comparación chunk/schedule y curva de Amdahl.
-
-6. Ejecutar análisis físico (usa Visualizer para exportar datos):
-
-```bash
-make analysis
-```
-
-También podés usar el alias pedido:
-
-```bash
-make analisys
-```
-
-Este comando genera:
-- `trajectories.dat` con posiciones muestreadas (step, time, id, x, y).
-- `energy_timeseries.dat` con energía total y métricas globales (si está activado en el target).
-- `physics_plots.png` con trayectorias de un subconjunto y deriva de energía total.
-
-7. Ejecutar test básico de aceleración:
-
+### Ejecutar Suite de Tests
+Es imperativo que todas las pruebas pasen antes de cualquier MR.
 ```bash
 make test
+make cuda-test
 ```
 
-Esto ejecuta:
-- `tests/test_acceleration` (caso base semana 1).
-- `tests/test_parallel_vs_serial` (semana 2: equivalencia serial/paralelo con tolerancia `1e-12`).
+### Ejecutar Benchmarks (Clúster DIINF)
 
-## Semana 2: Paralelizacion y comparacion
+Para generar los datos reales de ejecución en la GPU (Speedup, blockDim, ley de Amdahl), el proyecto cuenta con un script de SLURM (`pipeline_lab2.slurm`) automatizado.
 
-- `NBodySystem::computeAccelerationsParallel(schedule_type, chunk_size)` usa OpenMP.
-- `schedule_type`: `0=static`, `1=dynamic`, `2=guided`, `3=auto`.
-- `Benchmark::compareSerialVsParallel(...)` reporta tiempo serial/paralelo, speedup y diferencia maxima de aceleracion.
-- En `main.cpp` se imprime la comparacion con `N` pequeno y se valida `max |dA| <= 1e-12`.
+1. **Sube tu código al clúster** (o haz un `git pull` desde tu sesión SSH):
+   ```bash
+   scp -r /ruta/local/nbody_2d usuario@ssh.diinf.usach.cl:~/
+   ```
 
-## Docker
+2. **Inicia el pipeline automatizado**:
+   ```bash
+   ssh usuario@ssh.diinf.usach.cl
+   cd nbody_2d
+   sbatch pipeline_lab2.slurm
+   ```
 
-```bash
-docker build -t nbody_2d .
-docker run --rm nbody_2d
-```
+3. **Monitorea tu trabajo**:
+   ```bash
+   squeue -u usuario
+   ```
+
+4. **Recupera los resultados**:
+   Una vez finalizado el trabajo en la cola, el script habrá compilado, ejecutado todos los análisis requeridos y generado tu gráfico consolidado en:
+   `lab2_plots/performance_plots.png`
+   Descarga esa imagen a tu PC local y adjúntala a tu reporte.
+
+> [!NOTE] 
+> Asegúrate de ejecutar esto **solo en el nodo GPU del clúster** mediante SLURM para que los tiempos sean los oficiales de la entrega.
+
+---
+
+## 🔄 Tolerancias Numéricas
+Para que las aceleraciones calculadas por la GPU (`float` o `double`) se asuman correctas frente a la versión puramente serial de CPU, la función de testeo admite los siguientes márgenes (documentados y justificados):
+- `rtol = 1e-4`
+- `atol = 1e-8`
+
+Estas tolerancias acomodan el error de redondeo acumulativo y las discrepancias de FMA (Fused Multiply-Add) que el compilador `nvcc` inyecta durante las optimizaciones.
