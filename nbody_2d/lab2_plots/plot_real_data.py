@@ -14,28 +14,31 @@ def main():
     print("Cargando datos reales...")
     
     # 1. benchmark_results.dat
-    # Format: N, CPU_Time(ms), GPU_Basic_Kernel(ms), GPU_Basic_E2E(ms), GPU_Shared_Kernel(ms), GPU_Shared_E2E(ms)
+    # Format: N, BlockDim, CPU_Time(ms), GPU_Basic_Kernel(ms), GPU_Basic_E2E(ms), GPU_Shared_Kernel(ms), GPU_Shared_E2E(ms)
     bench_data = load_data('benchmark_results.dat')
-    N_values = bench_data[:, 0]
-    cpu_time = bench_data[:, 1]
-    gpu_basic_kernel = bench_data[:, 2]
-    gpu_basic_e2e = bench_data[:, 3]
-    gpu_shared_kernel = bench_data[:, 4]
-    gpu_shared_e2e = bench_data[:, 5]
+    
+    # Filter for BlockDim = 256 for scaling analysis
+    mask_256 = bench_data[:, 1] == 256
+    N_values = bench_data[mask_256, 0]
+    cpu_time = bench_data[mask_256, 2]
+    gpu_basic_kernel = bench_data[mask_256, 3]
+    gpu_basic_e2e = bench_data[mask_256, 4]
+    gpu_shared_kernel = bench_data[mask_256, 5]
+    gpu_shared_e2e = bench_data[mask_256, 6]
 
-    # 2. scaling_analysis.dat
-    # Format: N, Speedup_Basic, Speedup_Shared, Amdahl_Pred_Shared
-    scaling_data = load_data('scaling_analysis.dat')
-    speedup_basic = scaling_data[:, 1]
-    speedup_shared = scaling_data[:, 2]
-    amdahl_pred = scaling_data[:, 3]
+    # Calculate Speedup and Amdahl dynamically
+    speedup_basic = cpu_time / gpu_basic_e2e
+    speedup_shared = cpu_time / gpu_shared_e2e
+    sp_k = cpu_time / gpu_shared_kernel
+    transfer_time = gpu_shared_e2e - gpu_shared_kernel
+    f_serial = transfer_time / (cpu_time + transfer_time)
+    amdahl_pred = 1.0 / (f_serial + (1.0 - f_serial) / sp_k)
 
-    # 3. blockdim_study.dat
-    # Format: BlockDim, Time_Basic(ms), Time_Shared(ms)
-    blockdim_data = load_data('blockdim_study.dat')
-    blockdims = blockdim_data[:, 0]
-    bdim_basic = blockdim_data[:, 1]
-    bdim_shared = blockdim_data[:, 2]
+    # Filter for N = 2000 for blockDim study
+    mask_2000 = bench_data[:, 0] == 2000
+    blockdims = bench_data[mask_2000, 1]
+    bdim_basic = bench_data[mask_2000, 3]
+    bdim_shared = bench_data[mask_2000, 5]
 
     # 4. energy_timeseries.dat
     # Format: Step, Time, Kinetic, Potential, Total
