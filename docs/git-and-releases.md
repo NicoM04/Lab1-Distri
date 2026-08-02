@@ -18,23 +18,41 @@ releases acordado para el Laboratorio 2. Complementa la tabla resumen del
 ## 2. Ramas
 
 - `feature/<descripcion-corta>`: nueva funcionalidad (p. ej.
-  `feature/git-releases-agents`).
-- `fix/<descripcion-corta>`: corrección de errores.
+  `feature/git-releases-agents`, `feature/plots`).
+- `fix/<descripcion-corta>`: corrección de errores (p. ej.
+  `fix/bug-resolve`).
+- `docs/<descripcion-corta>`: cambios que son solo de documentación, sin
+  tocar código (p. ej. `docs/code-comments`, `docs/finalize-role4`).
 - Nombre descriptivo en kebab-case, sin incluir el número de issue en el
   nombre de la rama (el vínculo se hace en la PR, no en el nombre).
 
 ## 3. Ciclo de vida de un cambio
 
-1. Crear una rama `feature/*` o `fix/*` desde `main` actualizada.
+El flujo real, ya observado en el historial de `main`, es:
+
+**issue → rama `feature/`/`fix/`/`docs/` → commits → PR → CI
+(`ci.yml`) → comentario automático del agente revisor de PR → revisión
+humana → aprobación humana → merge.**
+
+En detalle:
+
+1. Crear una rama `feature/*`, `fix/*` o `docs/*` desde `main` actualizada.
 2. Trabajar y commitear en esa rama (nunca en `main`).
 3. Abrir una PR hacia `main` que incluya `Closes #<issue>`.
-4. Esperar a que `ci.yml` termine en verde.
-5. Solicitar revisión humana (al menos un/a integrante del equipo, o el
-   docente/ayudante según corresponda).
-6. Aplicar los cambios solicitados en la misma rama.
-7. Una vez aprobada y con CI en verde, una persona humana fusiona la PR
-   (merge o squash, según convenga).
-8. Eliminar la rama fusionada (localmente y en el remoto) para mantener el
+4. Esperar a que `ci.yml` termine (en verde o en fallo).
+5. El workflow `agent-pr-reviewer.yml` se dispara automáticamente al
+   terminar `ci.yml` (evento `workflow_run`) y publica un comentario en la
+   PR indicando el resultado del CI y si el cambio parece mecánico o
+   requiere revisión humana. Este comentario **nunca aprueba ni fusiona**
+   la PR; es solo informativo (ver `docs/agents-evidence.md` para ejemplos
+   reales de este comportamiento, p. ej. PR #18 y #23).
+6. Solicitar y obtener revisión humana (al menos un/a integrante del
+   equipo, o el docente/ayudante según corresponda).
+7. Aplicar los cambios solicitados en la misma rama.
+8. Una vez aprobada por una persona y con CI en verde, esa persona humana
+   fusiona la PR (merge o squash, según convenga). El merge es siempre una
+   acción humana, nunca del agente.
+9. Eliminar la rama fusionada (localmente y en el remoto) para mantener el
    repositorio limpio.
 
 ## 4. Rol de los agentes de IA en este flujo
@@ -54,6 +72,16 @@ disparadores, entradas/salidas y permisos de cada uno.
 **Importante: esta release todavía NO se ha publicado.** Los pasos abajo son
 el procedimiento a seguir cuando el equipo decida publicarla; no deben
 ejecutarse como parte de este trabajo.
+
+El tag y la release:
+
+- solo deben crearse desde `main` ya actualizada (con `CHANGELOG.md`
+  movido a `[2.0.0]` y todo lo demás fusionado);
+- deben crearse **después** de fusionar todos los entregables pendientes
+  (incluyendo el cierre documental del Rol 4);
+- **no se crean en esta rama** (`docs/finalize-role4` es solo
+  documentación; el tag se crea desde `main` una vez que esta rama, u otra
+  equivalente, ya esté fusionada).
 
 1. Actualizar `CHANGELOG.md`: mover las entradas de `[Unreleased]` a una
    nueva sección `## [2.0.0] - YYYY-MM-DD` con la fecha real de publicación.

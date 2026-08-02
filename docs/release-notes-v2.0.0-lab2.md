@@ -50,21 +50,51 @@ releases y agentes de IA de apoyo al equipo.
   dentro de esa imagen en cada push/PR, sin requerir GPU física en el
   runner.
 
+## Pipeline de benchmarks y gráficos (Rol 5)
+
+- `nbody_2d/BenchmarkCuda.cpp`/`.h`, expuesto vía el flag `-benchmark-cuda`
+  de `main.cpp`, con una **matriz combinada** de medición: para cada
+  tamaño de problema `N` (`256, 512, 1024, 2000`) y cada `blockDim.x`
+  (`64, 128, 256, 512, 1024`), mide tiempo CPU serial y tiempo GPU (kernel
+  básico y shared, tanto solo-kernel como extremo-a-extremo), exportando
+  todo a `benchmark_results.dat`.
+- `nbody_2d/lab2_plots/plot_real_data.py` genera los gráficos finales a
+  partir de esos datos.
+- `nbody_2d/pipeline_lab2.slurm`: script SLURM (`--partition=GPU`) para
+  ejecutar compilación, benchmark, simulación física y graficado completo
+  en el nodo GPU del clúster DIINF.
+- El pipeline y su código están fusionados en `main`; esta nota **no
+  afirma** que ya se haya ejecutado realmente en el clúster y producido
+  resultados — eso no es verificable desde el historial de Git (los `.dat`
+  y `.png` generados están excluidos por `.gitignore`), y de haber ocurrido
+  debe registrarse con evidencia externa al repositorio.
+
 ## Agentes de IA (Rol 4)
 
 - Agente documentador: revisa README(s) y `CHANGELOG.md`, abre issues
-  etiquetados ante documentación faltante/desactualizada o enlaces rotos.
+  etiquetados ante enlaces rotos o encabezados de archivo sin comentario
+  introductorio.
 - Agente revisor de bugs: análisis diario de `main` en busca de patrones de
-  riesgo (llamadas CUDA sin comprobación, tests rotos, archivos generados
-  versionados, tolerancias inconsistentes), escalando a humanos los cambios
-  que toquen física, API pública o lógica de kernels.
+  riesgo (llamadas CUDA sin comprobación, archivos generados versionados,
+  tolerancias inconsistentes, última conclusión de `ci.yml`), escalando a
+  humanos los cambios que toquen física, API pública o lógica de kernels.
 - Agente revisor de PR: comenta automáticamente cada PR tras finalizar su
   CI, clasificando el cambio como mecánico o que requiere revisión humana,
   sin aprobar ni fusionar nunca.
 - Los tres agentes están implementados con una capa de proveedor de IA
-  configurable (`scripts/agents/common.py`), soportan `--dry-run` y
-  respetan un límite de 5 issues automáticos por semana sin revisión
-  humana.
+  configurable (`scripts/agents/common.py`), soportan `--dry-run`, respetan
+  un límite de 5 issues automáticos por semana (fail-closed) por agente, y
+  garantizan por código —no solo por prompt— la frase "Requiere
+  intervención humana" y el recordatorio de que el merge es humano.
+- **Ejecución real:** los tres agentes ya se ejecutaron en GitHub Actions.
+  El documentador y el revisor de bugs abrieron issues reales (#10-#13 y
+  #14-#17 respectivamente) que el equipo corrigió (commits `3ecf7b7` y
+  `fbabdee`); el revisor de PR comentó las PR #18, #19, #21 y #23. En
+  todos los casos observados se usó el fallback de análisis estático (sin
+  proveedor de IA configurado), no un modelo generativo. Las seis
+  evidencias mínimas (dos por agente), con sus URLs de ejecución de GitHub
+  Actions verificadas manualmente por el equipo, ya están registradas en
+  `docs/agents-evidence.md`.
 
 ## Pruebas
 
@@ -73,15 +103,17 @@ releases y agentes de IA de apoyo al equipo.
   `test_gpu_integration`, `test_gpu_energy`, cubriendo casos de borde de
   tamaño de problema, tiles incompletos y comparación CPU/GPU.
 
-## Pendiente / fuera de alcance de esta release (Rol 5 y otros)
+## Pendiente / fuera de alcance de esta release
 
-- Mediciones de rendimiento en el nodo GPU del clúster DIINF (las mediciones
-  locales fueron hechas en una RTX 3050 vía WSL2 y quedan documentadas como
-  referencia, no como resultado final de cluster).
-- Cualquier entregable específico del Rol 5 (calidad/CI/visualización más
-  allá de lo ya fusionado) que no esté reflejado en el historial de `main`
-  al momento de este borrador.
-- Evidencia real de ejecución de los agentes de IA: ver
-  `docs/agents-evidence.md`, todavía sin casos registrados.
+- Confirmación y registro (con evidencia externa al repositorio: logs,
+  capturas) de una ejecución real del pipeline `pipeline_lab2.slurm` en el
+  nodo GPU del clúster DIINF con resultados finales. Las mediciones locales
+  previas (RTX 3050 vía WSL2, documentadas en `nbody_2d/README.md`) siguen
+  siendo solo de referencia, no el resultado oficial de clúster.
+- Que el proveedor de IA (GitHub Models u otro) quede efectivamente
+  configurado: las ejecuciones reales registradas en
+  `docs/agents-evidence.md` usaron el fallback de análisis estático, no un
+  modelo de IA generativo.
 - Publicación efectiva del tag y de la release `v2.0.0-lab2` (ver
-  `docs/git-and-releases.md`, sección 5, para el procedimiento).
+  `docs/git-and-releases.md`, sección 5, para el procedimiento). **No se
+  crea como parte de este documento ni de la rama `docs/finalize-role4`.**

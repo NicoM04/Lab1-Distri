@@ -56,8 +56,17 @@ borrador de notas y `docs/git-and-releases.md` para el procedimiento). El tag
   `.github/workflows/agent-bug-reviewer.yml`,
   `.github/workflows/agent-pr-reviewer.yml`.
 - Plantilla `docs/agents-evidence.md` para registrar evidencia real de
-  ejecución de los agentes.
+  ejecución de los agentes; completada con evidencia real verificable de los
+  tres agentes (issues #10/#13, #14/#17 y PR #18/#23, ver esa plantilla para
+  el detalle).
 - Borrador `docs/release-notes-v2.0.0-lab2.md` para la futura release.
+- Pipeline de benchmarking CUDA y generación de gráficos del Rol 5:
+  `nbody_2d/BenchmarkCuda.cpp`/`.h` (flag `-benchmark-cuda` en `main.cpp`),
+  con una matriz combinada de medición (`N` × `blockDim` × variante de
+  kernel básico/shared × modo kernel-only/end-to-end) exportada a
+  `benchmark_results.dat`; script `nbody_2d/lab2_plots/plot_real_data.py`
+  para graficar los resultados; script `nbody_2d/pipeline_lab2.slurm` para
+  ejecutar el pipeline completo en el nodo GPU del clúster DIINF vía SLURM.
 
 ### Changed
 
@@ -72,6 +81,24 @@ borrador de notas y `docs/git-and-releases.md` para el procedimiento). El tag
 - Flujo de trabajo Git formalizado para el Laboratorio 2: rama `main`
   protegida, ramas `feature/*`/`fix/*`, PR vinculada a issue, CI en verde y
   revisión humana antes de fusionar (ver `docs/git-and-releases.md`).
+- Comentarios introductorios (`/** @file ... */`) agregados a
+  `nbody_2d/CudaBuffer.h`, `nbody_2d/CudaCheck.cuh`,
+  `nbody_2d/NBodySimulator.h` y `nbody_2d/NBodySystem.h`, a partir de los
+  issues abiertos por `agent-documenter` (commit `3ecf7b7`, PR #19).
+- `nbody_2d/README.md` reescrito para documentar el pipeline de
+  benchmarking CUDA en clúster y su tabla de roles del Laboratorio 2.
+- Endurecimiento de los tres agentes de IA (ya incluido en la
+  implementación fusionada): límite semanal de issues automáticos
+  fail-closed (no crea el issue si no puede verificar el conteo); conteo y
+  deduplicación por la etiqueta específica de cada agente
+  (`agent-documenter`/`agent-bug-reviewer`) en vez de una etiqueta genérica
+  compartida; manejo unificado de errores HTTP (`HTTPError`, `URLError`,
+  timeouts, JSON inválido) convertidos siempre en un mensaje claro; frase
+  "Requiere intervención humana: `<motivo>`" y recordatorio de que el merge
+  es humano garantizados por código en vez de depender solo del prompt de
+  IA; revisor de bugs ahora también consulta (sin re-ejecutar) la última
+  conclusión de `ci.yml` en `main`. Ver `scripts/agents/tests/` (28 pruebas
+  unitarias) para la cobertura de estos comportamientos.
 
 ### Fixed
 
@@ -79,5 +106,10 @@ borrador de notas y `docs/git-and-releases.md` para el procedimiento). El tag
   estable en GitHub Actions sin requerir ejecución real de GPU en el runner
   (ver commits `Arreglo compilación CUDA en CI sin requerir ejecución GPU` y
   los sucesivos `Fixes CI` en el historial de `main`).
+- Llamadas a la API de CUDA (`cudaDeviceSynchronize` en
+  `nbody_2d/NBodySimulator.cpp:187,207`; `cudaFree` en
+  `nbody_2d/kernels/metrics.cu:132,165`) que no pasaban por la macro
+  `CUDA_CHECK`, detectadas por `agent-bug-reviewer` y corregidas en el
+  commit `fbabdee` (PR #18).
 
 [Unreleased]: https://github.com/NicoM04/Lab1-Distri/compare/main...HEAD
