@@ -766,7 +766,36 @@ Tres agentes de solo lectura sobre el código (con permiso de escritura
 limitado a issues/comentarios), implementados en `scripts/agents/` y
 disparados por los workflows en `.github/workflows/agent-*.yml`. Ninguno
 hace merge ni escribe en `main`. Detalle de diseño en
-`scripts/agents/README.md`.
+`scripts/agents/README.md`; procedimiento y flujo completo (issue → rama →
+PR → CI → comentario del agente → revisión y merge humano) en
+[`docs/git-and-releases.md`](docs/git-and-releases.md).
+
+**Estado real:** los tres agentes están versionados en `main` y **ya se
+ejecutaron mediante GitHub Actions** (no solo en `--dry-run` local). Esas
+ejecuciones observadas usaron el **fallback de análisis estático** de
+`scripts/agents/common.py` (el proveedor de IA no estaba configurado en ese
+momento), por lo que cada issue/comentario generado comenzó literalmente
+con `**ANÁLISIS ESTÁTICO (sin modelo de IA disponible)**`. Ese análisis
+estático **no es la salida de un modelo de IA generativo**: es la
+heurística determinística del propio script (enlaces rotos, comentarios de
+cabecera ausentes, llamadas CUDA sin `CUDA_CHECK`, archivos tocados en el
+diff de una PR). Aun así, el resultado fue real: el documentador y el
+revisor de bugs abrieron issues reales que el equipo corrigió, y el
+revisor de PR publicó comentarios reales indicando si una PR requería
+revisión humana. La evidencia verificable de estas ejecuciones (issues,
+PRs y su correspondencia con hallazgos concretos) está en
+[`docs/agents-evidence.md`](docs/agents-evidence.md). En ningún caso un
+agente aprobó, fusionó o hizo push a `main`: la aprobación y el merge de
+cada PR siguieron siendo una acción humana.
+
+- El **documentador** produjo issues por encabezados de archivos
+  CUDA/host sin comentario introductorio (ver issues #10-#13).
+- El **revisor de bugs** produjo issues por llamadas CUDA sin `CUDA_CHECK`
+  (ver issues #14-#17).
+- El **revisor de PR** comentó PRs indicando cuándo un cambio requería
+  revisión humana por tocar física/kernels/memoria CUDA, o por estar fuera
+  del alcance mecánico permitido (ver PR #18 y #23), recordando siempre que
+  el merge lo realiza una persona.
 
 | Agente | Herramienta | Disparador / frecuencia | Entradas | Salida | Criterio mecánico | Criterio humano | Permisos |
 |---|---|---|---|---|---|---|---|
@@ -798,7 +827,10 @@ con un error sin manejar.
 
 ### Proveedor de IA y secretos
 
-No hay ningún proveedor de IA ya configurado en este repositorio. La capa
+No hay ningún proveedor de IA configurado en este repositorio; por eso las
+ejecuciones reales observadas hasta ahora (ver
+[`docs/agents-evidence.md`](docs/agents-evidence.md)) usaron el fallback de
+análisis estático descrito arriba, no un modelo generativo. La capa
 `scripts/agents/common.py` es agnóstica de proveedor:
 
 1. Si existen los secrets `AGENT_API_URL` y `AGENT_API_KEY` (y opcionalmente
