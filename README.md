@@ -13,28 +13,15 @@ apoyo al mantenimiento del repositorio.
 
 ## Características principales
 
-- Simulación serial y paralela (OpenMP) del problema de N cuerpos, con
-  integración de Euler y cálculo de métricas físicas (energía cinética,
-  potencial y total).
-- Kernel CUDA básico de aceleraciones (`computeAccelerationsKernel`), un
-  hilo por cuerpo.
-- Kernel CUDA con memoria compartida (`computeAccelerationsKernelShared`),
-  procesamiento por tiles para reducir accesos a memoria global.
-- Gestión de memoria device mediante `CudaBuffer<T>`, una plantilla RAII
-  que encapsula `cudaMalloc`/`cudaFree`.
-- Layout Structure of Arrays (SoA) en memoria device (`d_mass`, `d_x`,
-  `d_y`, `d_vx`, `d_vy`, `d_ax`, `d_ay`) para favorecer coalescing.
-- Integración de Euler ejecutada en GPU (`eulerStepGpu`,
-  `NBodySystem::computeAccelerationsGpu`).
-- Cálculo de energía cinética y potencial en GPU, con dos estrategias:
-  reducción en memoria compartida + `atomicAdd`, y acumulación atómica
-  directa.
-- Validación numérica CPU–GPU con tolerancias documentadas.
-- Benchmarking CUDA en modo kernel-only y extremo-a-extremo, con una
-  matriz combinada de tamaño de problema, tamaño de bloque, variante de
-  kernel y modo de medición.
-- Pipeline reproducible de benchmarking y generación de gráficos,
-  incluyendo un script para ejecución en el clúster GPU vía SLURM.
+- Simulador N-cuerpos 2D con integración de Euler y cálculo de métricas
+  físicas (energía cinética, potencial y total).
+- **Laboratorio 1:** paralelización CPU con OpenMP, con análisis de
+  scaling, comparación de schedules y Ley de Amdahl.
+- **Laboratorio 2:** aceleración GPU con CUDA — kernel básico y kernel con
+  memoria compartida, gestión RAII de memoria device (`CudaBuffer`),
+  layout SoA, integración de Euler y cálculo de energía en GPU, validación
+  numérica CPU–GPU, y un pipeline de benchmarking con ejecución opcional
+  en clúster.
 - Integración continua dockerizada, flujo Git con revisión humana
   obligatoria, y agentes automatizados de documentación, revisión de
   código y revisión de Pull Requests.
@@ -73,30 +60,75 @@ objetos compilados (`*.o`) y binarios generados por `make`.
 ## Requisitos y entorno
 
 - Compilador C++17 con soporte OpenMP (`g++`).
-- CUDA Toolkit y `nvcc` para compilar y ejecutar la ruta GPU (probado con
-  CUDA 12.2 en la imagen Docker del proyecto y CUDA 12.8 en entornos de
+- CUDA Toolkit y `nvcc`: necesarios para **compilar** el proyecto completo,
+  incluso si solo se usará la ruta CPU/OpenMP — los kernels CUDA se
+  compilan y enlazan en el mismo ejecutable principal (probado con CUDA
+  12.2 en la imagen Docker del proyecto y CUDA 12.8 en entornos de
   desarrollo local).
-- GPU NVIDIA para ejecutar (no solo compilar) los kernels y las pruebas
-  CUDA.
-- Catch2 v3 para las pruebas unitarias.
+- GPU NVIDIA: necesaria únicamente para **ejecutar** (no para compilar) los
+  kernels y las pruebas CUDA del Laboratorio 2.
+- Catch2 v3 para las pruebas unitarias (ambos laboratorios).
 - Python 3 con Matplotlib para los scripts de graficación
-  (`plot_reports.py`, `lab2_plots/plot_real_data.py`).
+  (`plot_reports.py` para el Laboratorio 1, `lab2_plots/plot_real_data.py`
+  para el Laboratorio 2).
 - Docker, opcional, para compilar y ejecutar sin instalar dependencias
   localmente (ver más abajo).
-- Un entorno con SLURM (como el clúster DIINF) solo si se ejecuta
+- Un entorno con SLURM (como el clúster DIINF), solo si se ejecuta
   `pipeline_lab2.slurm`.
 
-## Compilación y pruebas
-
-Desde `nbody_2d/`:
+## Docker
 
 ```bash
-make              # compila el ejecutable nbody_2d
-make test         # compila y ejecuta la suite CPU (Catch2)
+docker pull ghcr.io/nicom04/lab1-distri:base
+
+docker run --rm -v $(pwd):/workspace -w /workspace \
+  ghcr.io/nicom04/lab1-distri:base bash -c "make clean && make all && make test"
+```
+
+La imagen (`nvidia/cuda:12.2.2-devel-ubuntu22.04` con Catch2 preinstalado)
+se publica automáticamente vía `build_base_container.yml` cuando cambia el
+`Dockerfile`, y es la misma que usa `ci.yml`. Compila el proyecto completo
+(ambos laboratorios); ejecutar realmente los kernels CUDA requiere una GPU
+física, no disponible en este contenedor genérico ni en GitHub Actions.
+
+## Laboratorio 1 — CPU y OpenMP
+
+### Compilación y pruebas
+
+```bash
+cd nbody_2d
+make          # compila el ejecutable nbody_2d (requiere CUDA Toolkit para enlazar, no GPU)
+make test     # compila y ejecuta la suite CPU (Catch2)
+make clean    # elimina objetos y ejecutables generados
+```
+
+### Benchmarks y ejecución
+
+```bash
+make benchmark   # benchmark completo, scaling (1/2/4/8 hilos) y comparación de schedules
+make analysis    # simulación física, exporta trayectorias y energía
+```
+
+Ambos targets aceptan parámetros manuales del binario (`-N`, `-threads`,
+`-schedule`, `-chunk`, `-steps`, `-sample`, entre otros); ver `main.cpp`
+para el listado completo.
+
+### Resultados generados
+
+- `Resultados_Benchmark/*.dat` y `performance_plots.png`: tiempo, speedup,
+  eficiencia y comparación contra la Ley de Amdahl (`make benchmark`).
+- `Resultados_Analisis/*.dat` (`trajectories.dat`, `energy_timeseries.dat`)
+  y `physics_plots.png`: simulación física (`make analysis`).
+
+## Laboratorio 2 — GPU y CUDA
+
+### Compilación y pruebas
+
+```bash
+cd nbody_2d
 make cuda-build   # compila las pruebas CUDA (no las ejecuta)
 make cuda-test    # compila y ejecuta la suite CUDA (requiere GPU NVIDIA)
 make test-all     # make test seguido de make cuda-test
-make clean        # elimina objetos y ejecutables generados
 ```
 
 La arquitectura CUDA de compilación se controla con `CUDA_ARCH` (valor por
@@ -113,38 +145,7 @@ CUDA en cada push/PR, pero **no las ejecuta**: los runners de GitHub
 Actions no tienen GPU disponible, por lo que solo la suite CPU corre
 realmente en CI.
 
-### Con Docker
-
-```bash
-docker pull ghcr.io/nicom04/lab1-distri:base
-
-docker run --rm -v $(pwd):/workspace -w /workspace \
-  ghcr.io/nicom04/lab1-distri:base bash -c "make clean && make all && make test"
-```
-
-La imagen (`nvidia/cuda:12.2.2-devel-ubuntu22.04` con Catch2 preinstalado)
-se publica automáticamente vía `build_base_container.yml` cuando cambia el
-`Dockerfile`. Los mismos comandos de `make benchmark`/`make analysis`
-descritos abajo funcionan reemplazando el `bash -c "..."` correspondiente.
-
-## Ejecución y benchmarks
-
-### CPU / OpenMP
-
-```bash
-make benchmark   # benchmark completo, scaling (1/2/4/8 hilos) y comparación de schedules
-make analysis    # simulación física, exporta trayectorias y energía
-```
-
-`make benchmark` genera `Resultados_Benchmark/` (`.dat` de tiempo/speedup y
-`performance_plots.png`, con speedup, eficiencia y comparación contra la
-Ley de Amdahl). `make analysis` genera `Resultados_Analisis/`
-(`trajectories.dat`, `energy_timeseries.dat`, `physics_plots.png`). Ambos
-targets aceptan parámetros manuales del binario (`-N`, `-threads`,
-`-schedule`, `-chunk`, `-steps`, `-sample`, entre otros); ver
-`./nbody_2d -help` o `main.cpp` para el listado completo.
-
-### GPU / CUDA
+### Benchmarks y ejecución
 
 ```bash
 ./nbody_2d -benchmark-cuda [-iters N]
@@ -180,7 +181,7 @@ El script está preparado para el nodo GPU del clúster DIINF
 (`--partition=GPU` en la cabecera SLURM) y documentado en
 [`nbody_2d/README.md`](nbody_2d/README.md).
 
-## Validación numérica
+### Validación numérica
 
 La versión CPU serial se conserva como referencia de corrección para todas
 las rutas GPU. Las comparaciones numéricas usan:
@@ -203,6 +204,17 @@ La suite CPU (Catch2) mantiene 208 assertions en 6 casos de prueba. La
 suite CUDA cubre además casos de borde: `N = 0`, `N` menor, igual y no
 múltiplo de `blockDim.x`, tiles incompletos, punteros device nulos,
 tamaño de bloque y variante inválidos.
+
+### Resultados generados
+
+- `lab2_plots/benchmark_results.dat` y `lab2_plots/performance_plots.png`:
+  matriz de benchmarking CUDA (`-benchmark-cuda` + `plot_real_data.py`).
+- `lab2_plots/trajectories.dat` y `lab2_plots/energy_timeseries.dat`:
+  generados por `pipeline_lab2.slurm` al ejecutar el pipeline completo en
+  el clúster.
+
+Todos los archivos anteriores son artefactos generados por `make`/los
+scripts y no están versionados en el repositorio (ver `.gitignore`).
 
 ## Flujo Git
 
@@ -254,21 +266,6 @@ revisor de bugs abrió los issues #14 a #17 por llamadas CUDA sin
 indicando si el cambio requería revisión humana. El detalle completo de
 estas ejecuciones, con las URLs verificadas de cada issue, PR y ejecución
 de Actions, está en [`docs/agents-evidence.md`](docs/agents-evidence.md).
-
-## Resultados y archivos generados
-
-- `Resultados_Benchmark/*.dat` y `performance_plots.png`: benchmarking
-  CPU/OpenMP (`make benchmark`).
-- `Resultados_Analisis/*.dat` y `physics_plots.png`: simulación física
-  CPU (`make analysis`).
-- `lab2_plots/benchmark_results.dat` y `lab2_plots/performance_plots.png`:
-  matriz de benchmarking CUDA (`-benchmark-cuda` + `plot_real_data.py`).
-- `lab2_plots/trajectories.dat` y `lab2_plots/energy_timeseries.dat`:
-  generados por `pipeline_lab2.slurm` al ejecutar el pipeline completo en
-  el clúster.
-
-Estos archivos son artefactos generados por `make`/los scripts y no están
-versionados en el repositorio (ver `.gitignore`).
 
 ## Release
 
