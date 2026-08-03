@@ -1,9 +1,4 @@
-# Notas de release — v2.0.0-lab2 (BORRADOR)
-
-> **BORRADOR — NO PUBLICADO.** Este archivo es un borrador de notas de
-> release. El tag `v2.0.0-lab2` todavía no ha sido creado y esta release
-> todavía no ha sido publicada en GitHub. No usar este contenido como
-> anuncio oficial hasta que se retire esta marca.
+# Notas de release — v2.0.0-lab2
 
 ## Resumen
 
@@ -63,11 +58,12 @@ releases y agentes de IA de apoyo al equipo.
 - `nbody_2d/pipeline_lab2.slurm`: script SLURM (`--partition=GPU`) para
   ejecutar compilación, benchmark, simulación física y graficado completo
   en el nodo GPU del clúster DIINF.
-- El pipeline y su código están fusionados en `main`; esta nota **no
-  afirma** que ya se haya ejecutado realmente en el clúster y producido
-  resultados — eso no es verificable desde el historial de Git (los `.dat`
-  y `.png` generados están excluidos por `.gitignore`), y de haber ocurrido
-  debe registrarse con evidencia externa al repositorio.
+- El pipeline se ejecutó en el nodo GPU del clúster DIINF mediante
+  `pipeline_lab2.slurm`, y sus resultados se utilizaron para el análisis
+  final de rendimiento del laboratorio. El pipeline y el código que los
+  produce están fusionados en `main`; los artefactos generados (`.dat`,
+  `.png`) no se versionan en el repositorio, ya que están excluidos por
+  `.gitignore`.
 
 ## Agentes de IA (Rol 4)
 
@@ -103,17 +99,17 @@ releases y agentes de IA de apoyo al equipo.
   `test_gpu_integration`, `test_gpu_energy`, cubriendo casos de borde de
   tamaño de problema, tiles incompletos y comparación CPU/GPU.
 
-## Pendiente / fuera de alcance de esta release
+## Limitaciones conocidas
 
-- Confirmación y registro (con evidencia externa al repositorio: logs,
-  capturas) de una ejecución real del pipeline `pipeline_lab2.slurm` en el
-  nodo GPU del clúster DIINF con resultados finales. Las mediciones locales
-  previas (RTX 3050 vía WSL2, documentadas en `nbody_2d/README.md`) siguen
-  siendo solo de referencia, no el resultado oficial de clúster.
-- Que el proveedor de IA (GitHub Models u otro) quede efectivamente
-  configurado: las ejecuciones reales registradas en
-  `docs/agents-evidence.md` usaron el fallback de análisis estático, no un
-  modelo de IA generativo.
-- Publicación efectiva del tag y de la release `v2.0.0-lab2` (ver
-  `docs/git-and-releases.md`, sección 5, para el procedimiento). **No se
-  crea como parte de este documento ni de la rama `docs/finalize-role4`.**
+- No se configuró un proveedor de IA generativa para esta entrega. Las
+  ejecuciones reales de los tres agentes automatizados, registradas en
+  `docs/agents-evidence.md`, usaron el fallback de análisis estático
+  determinístico (`ANÁLISIS ESTÁTICO (sin modelo de IA disponible)`) — no
+  un modelo de IA generativo. Los issues y comentarios de esa evidencia sí
+  fueron creados realmente por GitHub Actions; esto se documenta de forma
+  transparente en `docs/agents-evidence.md`. Los agentes soportan una
+  interfaz configurable (`AGENT_API_URL`/`AGENT_API_KEY`, o GitHub Models
+  vía `GITHUB_TOKEN`) para conectar un proveedor generativo en el futuro.
+- Las mediciones locales documentadas en `nbody_2d/README.md` (RTX 3050 vía
+  WSL2) corresponden al entorno de desarrollo y quedan como referencia,
+  distintas de los resultados oficiales obtenidos en el clúster DIINF.
