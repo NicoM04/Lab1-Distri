@@ -22,7 +22,7 @@ releases acordado para el Laboratorio 2. Complementa la tabla resumen del
 - `fix/<descripcion-corta>`: corrección de errores (p. ej.
   `fix/bug-resolve`).
 - `docs/<descripcion-corta>`: cambios que son solo de documentación, sin
-  tocar código (p. ej. `docs/code-comments`, `docs/finalize-role4`).
+  tocar código (p. ej. `docs/code-comments`).
 - Nombre descriptivo en kebab-case, sin incluir el número de issue en el
   nombre de la rama (el vínculo se hace en la PR, no en el nombre).
 
@@ -69,29 +69,36 @@ disparadores, entradas/salidas y permisos de cada uno.
 
 ## 5. Procedimiento de release `v2.0.0-lab2`
 
-**Importante: esta release todavía NO se ha publicado.** Los pasos abajo son
-el procedimiento a seguir cuando el equipo decida publicarla; no deben
-ejecutarse como parte de este trabajo.
+El tag y la GitHub Release se crean siempre desde `main` ya actualizada, y
+únicamente después de fusionar todas las PR destinadas a esta versión. Los
+pasos siguientes se ejecutan manualmente, fuera de cualquier rama
+documental, una vez cumplida esa condición:
 
-El tag y la release:
+1. Confirmar que todas las PR destinadas a la versión están fusionadas en
+   `main`.
+2. Confirmar que la copia local de `main` está actualizada
+   (`git switch main && git pull --ff-only origin main`).
+3. Confirmar que `ci.yml` está en verde sobre `main`.
+4. Verificar que `CHANGELOG.md` contiene la sección `## [2.0.0]` con la
+   fecha real de publicación.
+5. Crear el tag anotado `v2.0.0-lab2` desde `main`.
+6. Subir el tag al remoto.
+7. Crear la GitHub Release usando como contenido
+   `docs/release-notes-v2.0.0-lab2.md`.
+8. Publicarla como release principal (no como pre-release).
+9. Cerrar el issue #7 una vez verificada la publicación del tag y de la
+   release.
 
-- solo deben crearse desde `main` ya actualizada (con `CHANGELOG.md`
-  movido a `[2.0.0]` y todo lo demás fusionado);
-- deben crearse **después** de fusionar todos los entregables pendientes
-  (incluyendo el cierre documental del Rol 4);
-- **no se crean en esta rama** (`docs/finalize-role4` es solo
-  documentación; el tag se crea desde `main` una vez que esta rama, u otra
-  equivalente, ya esté fusionada).
+```bash
+git switch main
+git pull --ff-only origin main
+git tag -a v2.0.0-lab2 -m "Laboratorio 2: aceleración GPU con CUDA"
+git push origin v2.0.0-lab2
+```
 
-1. Actualizar `CHANGELOG.md`: mover las entradas de `[Unreleased]` a una
-   nueva sección `## [2.0.0] - YYYY-MM-DD` con la fecha real de publicación.
-2. Confirmar que `ci.yml` está en verde sobre `main`.
-3. Fusionar cualquier PR pendiente que deba incluirse en la release.
-4. Crear el tag `v2.0.0-lab2` desde `main` (`git tag -a v2.0.0-lab2 -m "..."`
-   y `git push origin v2.0.0-lab2`), solo después de los pasos anteriores.
-5. Publicar las notas de la release en GitHub usando como base
-   `docs/release-notes-v2.0.0-lab2.md` (retirando la marca de BORRADOR una
-   vez verificado su contenido).
+Estos comandos son manuales y se ejecutan después de fusionar la PR que
+cierra la documentación de la versión; no forman parte de ningún commit
+automático.
 
 ## 6. Buenas prácticas de commits
 

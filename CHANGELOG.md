@@ -9,7 +9,7 @@ y este proyecto intenta adherirse a [Versionado Semántico](https://semver.org/l
 
 Sin cambios adicionales registrados desde el cierre de la versión 2.0.0.
 
-## [2.0.0] - 2026-08-02
+## [2.0.0] - 2026-08-03
 
 Laboratorio 2: aceleración por GPU (CUDA) del simulador N-cuerpos 2D, con
 flujo Git formalizado, integración continua extendida y agentes
@@ -86,5 +86,5 @@ automatizados de apoyo al repositorio.
 - Ajustes al pipeline de benchmarking y graficación CUDA tras su primera
   integración.
 
-Los enlaces comparativos entre versiones se agregarán una vez publicado el
-tag `v2.0.0-lab2`.
+[Unreleased]: https://github.com/NicoM04/Lab1-Distri/compare/v2.0.0-lab2...HEAD
+[2.0.0]: https://github.com/NicoM04/Lab1-Distri/releases/tag/v2.0.0-lab2

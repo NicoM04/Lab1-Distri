@@ -269,10 +269,9 @@ de Actions, está en [`docs/agents-evidence.md`](docs/agents-evidence.md).
 
 ## Release
 
-La entrega final del Laboratorio 2 se publica mediante el tag
-`v2.0.0-lab2`, creado desde `main` una vez fusionados los cambios
-pendientes. El historial de cambios está en [`CHANGELOG.md`](CHANGELOG.md)
-y las notas de la release en
-[`docs/release-notes-v2.0.0-lab2.md`](docs/release-notes-v2.0.0-lab2.md).
-El procedimiento detallado de release está en
+La versión final del Laboratorio 2 se identifica mediante el tag
+`v2.0.0-lab2`, creado desde la rama `main`. El historial de cambios se
+encuentra en [`CHANGELOG.md`](CHANGELOG.md), las notas de la versión en
+[`docs/release-notes-v2.0.0-lab2.md`](docs/release-notes-v2.0.0-lab2.md), y
+el procedimiento de publicación en
 [`docs/git-and-releases.md`](docs/git-and-releases.md).

@@ -3,7 +3,7 @@
 Este archivo registra evidencia **real** (no simulada) de ejecuciones de los
 tres agentes de IA del Rol 4. Cada fila se completa solo con datos que pueden
 sustentarse en el repositorio (commits, PRs fusionadas, historial de `main`)
-o que fueron reportados directamente por el equipo. Cuando una URL no estaba disponible, se dejaba temporalmente marcada como pendiente.
+o que fueron reportados directamente por el equipo.
 
 **Proveedor de IA en las ejecuciones registradas:** en todos los casos de
 esta tabla, la ejecución real utilizó el **fallback estático** de
