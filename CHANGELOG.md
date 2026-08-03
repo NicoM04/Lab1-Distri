@@ -7,109 +7,84 @@ y este proyecto intenta adherirse a [Versionado Semántico](https://semver.org/l
 
 ## [Unreleased]
 
-Cuando se publique la release, estas entradas se moverán a una sección
-`## [2.0.0] - YYYY-MM-DD` (ver `docs/release-notes-v2.0.0-lab2.md` para el
-borrador de notas y `docs/git-and-releases.md` para el procedimiento). El tag
-`v2.0.0-lab2` todavía **no** ha sido creado.
+Sin cambios adicionales registrados desde el cierre de la versión 2.0.0.
+
+## [2.0.0] - 2026-08-02
+
+Laboratorio 2: aceleración por GPU (CUDA) del simulador N-cuerpos 2D, con
+flujo Git formalizado, integración continua extendida y agentes
+automatizados de apoyo al repositorio.
 
 ### Added
 
-- Kernels CUDA de aceleraciones gravitatorias: variante básica
-  (`computeAccelerationsKernel`) y variante con memoria compartida
-  (`computeAccelerationsKernelShared`), con lanzadores configurables por
-  tamaño de bloque (`kernels/accelerations.cu`, `kernels/accelerations.cuh`).
-- Clase RAII `CudaBuffer<T>` para gestión de memoria device (`cudaMalloc`/
-  `cudaFree` automáticos) usada por el layout SoA (`d_mass`, `d_x`, `d_y`,
-  `d_vx`, `d_vy`, `d_ax`, `d_ay`) (`nbody_2d/CudaBuffer.h`).
-- Macro `CUDA_CHECK` para comprobación de errores de la API CUDA
-  (`nbody_2d/CudaCheck.cuh`).
-- Integración Euler en GPU (`eulerStepGpu`) y ruta completa
-  `NBodySystem::computeAccelerationsGpu(...)` (kernel + sincronización +
-  transferencias D2H), con contador `deviceTransferCount()` para trazabilidad
-  de copias host/device.
-- Cálculo de energía cinética y potencial en GPU
-  (`NBodySimulator::calculateEnergyGpu(int method)`) con dos estrategias:
-  reducción en memoria compartida + `atomicAdd` (`method = 0`) y acumulación
-  puramente atómica (`method = 1`).
-- Pruebas CUDA: `cuda_buffer_roundtrip_test`, `gpu_accelerations_smoke_test`,
-  `test_gpu_integration`, `test_gpu_energy`, cubriendo casos de borde (`N=0`,
-  `N` no múltiplo de `blockDim.x`, tiles incompletos, punteros nulos, tamaños
-  de bloque inválidos) y comparaciones CPU vs. GPU con `rtol = 1e-4`,
-  `atol = 1e-8`.
-- Target `cuda-test` y `test-all` en el `Makefile` para compilar/ejecutar la
-  suite CUDA junto a la suite CPU existente.
-- `Dockerfile` basado en `nvidia/cuda:12.2.2-devel-ubuntu22.04` con Catch2 v3
-  preinstalado, usado como imagen base publicada en GHCR.
-- Workflow `build_base_container.yml`: construye y publica la imagen base en
-  GHCR cuando cambia `Dockerfile`, y hace una compilación de humo dentro del
-  contenedor.
-- Workflow `ci.yml`: en cada push/PR, compila (`make all && make cuda-build`)
-  y ejecuta `make test` dentro de la imagen base publicada en GHCR.
-- `CHANGELOG.md` siguiendo Keep a Changelog (este archivo).
-- Documentación del flujo Git y de releases en `docs/git-and-releases.md`.
-- Tres agentes de IA en `scripts/agents/` (documentador, revisor de bugs y
-  revisor de pull requests) con arquitectura de proveedor de IA
-  configurable (`scripts/agents/common.py`), soporte `--dry-run` y límite de
-  5 issues automáticos por semana.
-- Workflows de disparo para los agentes de IA:
-  `.github/workflows/agent-documenter.yml`,
-  `.github/workflows/agent-bug-reviewer.yml`,
-  `.github/workflows/agent-pr-reviewer.yml`.
-- Plantilla `docs/agents-evidence.md` para registrar evidencia real de
-  ejecución de los agentes; completada con evidencia real verificable de los
-  tres agentes (issues #10/#13, #14/#17 y PR #18/#23, ver esa plantilla para
-  el detalle).
-- Borrador `docs/release-notes-v2.0.0-lab2.md` para la futura release.
-- Pipeline de benchmarking CUDA y generación de gráficos del Rol 5:
-  `nbody_2d/BenchmarkCuda.cpp`/`.h` (flag `-benchmark-cuda` en `main.cpp`),
-  con una matriz combinada de medición (`N` × `blockDim` × variante de
-  kernel básico/shared × modo kernel-only/end-to-end) exportada a
-  `benchmark_results.dat`; script `nbody_2d/lab2_plots/plot_real_data.py`
-  para graficar los resultados; script `nbody_2d/pipeline_lab2.slurm` para
-  ejecutar el pipeline completo en el nodo GPU del clúster DIINF vía SLURM.
+- Kernel CUDA básico para el cálculo de aceleraciones gravitatorias, con
+  un hilo por cuerpo (`computeAccelerationsKernel`).
+- Kernel CUDA con memoria compartida (tiling) para reducir accesos a
+  memoria global (`computeAccelerationsKernelShared`).
+- Gestión RAII de memoria device mediante `CudaBuffer<T>`, usada por un
+  layout SoA (`d_mass`, `d_x`, `d_y`, `d_vx`, `d_vy`, `d_ax`, `d_ay`).
+- Integración de Euler ejecutada en GPU (`eulerStepGpu`,
+  `NBodySystem::computeAccelerationsGpu`).
+- Cálculo de energía cinética y potencial en GPU, mediante reducción en
+  memoria compartida y mediante operaciones atómicas.
+- Suite de pruebas CPU–GPU (`cuda_buffer_roundtrip_test`,
+  `gpu_accelerations_smoke_test`, `test_gpu_integration`,
+  `test_gpu_energy`), cubriendo casos de borde de tamaño de problema,
+  tiles incompletos, punteros nulos y parámetros inválidos.
+- Pipeline reproducible de benchmarking CUDA (`BenchmarkCuda`, flag
+  `-benchmark-cuda`) con una matriz combinada de tamaño de problema (`N`),
+  tamaño de bloque (`blockDim.x`), variante de kernel y modo de medición
+  (kernel-only / extremo-a-extremo).
+- Script de graficación (`lab2_plots/plot_real_data.py`) y job SLURM
+  (`pipeline_lab2.slurm`) para ejecutar el pipeline completo en un nodo
+  GPU de clúster.
+- Imagen Docker base con CUDA Toolkit y Catch2, publicada en GHCR
+  (`build_base_container.yml`), y workflow de integración continua
+  (`ci.yml`) que compila la ruta GPU y ejecuta la suite CPU en cada
+  push/PR.
+- Flujo Git formalizado (rama `main` protegida, ramas
+  `feature/*`/`fix/*`/`docs/*`, PR vinculada a issue, CI en verde,
+  revisión humana antes de fusionar), documentado en
+  `docs/git-and-releases.md`.
+- Tres agentes automatizados (documentador, revisor de bugs, revisor de
+  Pull Requests) con arquitectura de proveedor de IA configurable
+  (`scripts/agents/common.py`), workflows de disparo propios
+  (`.github/workflows/agent-*.yml`) y pruebas unitarias
+  (`scripts/agents/tests/`).
+- Documentación y evidencia de ejecución real de los agentes
+  (`docs/agents-evidence.md`), y notas de release
+  (`docs/release-notes-v2.0.0-lab2.md`).
 
 ### Changed
 
-- `README.md` actualizado en las ramas de kernels CUDA, `CudaBuffer` e
-  integración/energía GPU para documentar el diseño SoA, el contrato
-  host/device, las tolerancias numéricas y los comandos de compilación CUDA.
-- `nbody_2d/README.md` actualizado para documentar el layout SoA en memoria
-  device y el ciclo de transferencias `CudaBuffer<T>`.
-- `.gitignore` (raíz y `nbody_2d/`) actualizado para excluir binarios y
-  ejecutables de las pruebas CUDA (`cuda_buffer_roundtrip_test`,
-  `gpu_accelerations_smoke_test`, `gpu_integration_test`, `gpu_energy_test`).
-- Flujo de trabajo Git formalizado para el Laboratorio 2: rama `main`
-  protegida, ramas `feature/*`/`fix/*`, PR vinculada a issue, CI en verde y
-  revisión humana antes de fusionar (ver `docs/git-and-releases.md`).
-- Comentarios introductorios (`/** @file ... */`) agregados a
-  `nbody_2d/CudaBuffer.h`, `nbody_2d/CudaCheck.cuh`,
-  `nbody_2d/NBodySimulator.h` y `nbody_2d/NBodySystem.h`, a partir de los
-  issues abiertos por `agent-documenter` (commit `3ecf7b7`, PR #19).
-- `nbody_2d/README.md` reescrito para documentar el pipeline de
-  benchmarking CUDA en clúster y su tabla de roles del Laboratorio 2.
-- Endurecimiento de los tres agentes de IA (ya incluido en la
-  implementación fusionada): límite semanal de issues automáticos
-  fail-closed (no crea el issue si no puede verificar el conteo); conteo y
-  deduplicación por la etiqueta específica de cada agente
-  (`agent-documenter`/`agent-bug-reviewer`) en vez de una etiqueta genérica
-  compartida; manejo unificado de errores HTTP (`HTTPError`, `URLError`,
-  timeouts, JSON inválido) convertidos siempre en un mensaje claro; frase
-  "Requiere intervención humana: `<motivo>`" y recordatorio de que el merge
-  es humano garantizados por código en vez de depender solo del prompt de
-  IA; revisor de bugs ahora también consulta (sin re-ejecutar) la última
-  conclusión de `ci.yml` en `main`. Ver `scripts/agents/tests/` (28 pruebas
-  unitarias) para la cobertura de estos comportamientos.
+- Integración del simulador CPU/OpenMP existente con las variantes CUDA,
+  manteniendo la ruta serial como referencia de corrección.
+- `Makefile` y `Dockerfile` adaptados para compilar y probar la ruta CUDA
+  junto con la ruta CPU existente.
+- CI extendido para compilar los kernels y pruebas CUDA además de ejecutar
+  la suite CPU en cada push/PR.
+- README y documentación técnica actualizados para reflejar el diseño SoA,
+  el contrato host/device, las tolerancias numéricas y el flujo Git del
+  Laboratorio 2.
+- Manejo de errores, deduplicación, límite semanal y clasificación
+  mecánico/humano de los agentes endurecidos: límite de issues automáticos
+  fail-closed, conteo por la etiqueta específica de cada agente, manejo
+  unificado de errores HTTP, y garantía por código (no solo por prompt) de
+  la frase de intervención humana y del recordatorio de que el merge es
+  humano.
+- Comentarios introductorios incorporados en los archivos señalados por el
+  agente documentador (`CudaBuffer.h`, `CudaCheck.cuh`,
+  `NBodySimulator.h`, `NBodySystem.h`).
 
 ### Fixed
 
-- Múltiples correcciones al pipeline de CI para lograr una compilación CUDA
-  estable en GitHub Actions sin requerir ejecución real de GPU en el runner
-  (ver commits `Arreglo compilación CUDA en CI sin requerir ejecución GPU` y
-  los sucesivos `Fixes CI` en el historial de `main`).
-- Llamadas a la API de CUDA (`cudaDeviceSynchronize` en
-  `nbody_2d/NBodySimulator.cpp:187,207`; `cudaFree` en
-  `nbody_2d/kernels/metrics.cu:132,165`) que no pasaban por la macro
-  `CUDA_CHECK`, detectadas por `agent-bug-reviewer` y corregidas en el
-  commit `fbabdee` (PR #18).
+- Llamadas a la API de CUDA sin la macro `CUDA_CHECK` en
+  `NBodySimulator.cpp` y `kernels/metrics.cu`, detectadas por el agente
+  revisor de bugs.
+- Problemas de compilación CUDA e integración con CI para lograr una
+  compilación estable en GitHub Actions sin requerir GPU en el runner.
+- Ajustes al pipeline de benchmarking y graficación CUDA tras su primera
+  integración.
 
-[Unreleased]: https://github.com/NicoM04/Lab1-Distri/compare/main...HEAD
+Los enlaces comparativos entre versiones se agregarán una vez publicado el
+tag `v2.0.0-lab2`.
